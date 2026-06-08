@@ -1,12 +1,27 @@
 // app/api/admin/login/route.js
 
+import connectDB from "@/lib/db";
+import User from "@/models/User";
 import { SignJWT } from "jose";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
-  const { emailOrPhone, password } = await req.json();
+  await connectDB();
+  const { identifier, password } = await req.json();
+  console.log(identifier, password);
 
   // Find admin in DB here
+  let user = await User.findOne({
+    $or: [{ email: identifier }, { phoneNumber: identifier }],
+  });
+console.log(user);
+  if (!user || !(password ===user.password)) {
+    return NextResponse.json(
+      { success: false, error: "Invalid credentials" },
+      { status: 401 }
+    );
+  }
+
 
   const secret = new TextEncoder().encode(
     process.env.JWT_SECRET

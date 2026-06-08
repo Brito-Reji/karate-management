@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 const userSchema = new Schema({
     name: { type: String, required: true },
     email: { type: String, unique: true },
-    phoneNo: { type: String, unique: true },
+    phone: { type: String, unique: true },
     password: { type: String },
     role: { type: String, required: true, enum: ["admin", "instructor", "student"] },
     isBlocked: { type: Boolean, default: false },
