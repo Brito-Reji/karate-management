@@ -1,17 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function DojosPage() {
-  // 1. Core State Registries
-  const [dojos, setDojos] = useState([
-    { id: 'DJ-01', name: 'HQ Central Dojo', location: 'Kochi, Kerala', instructor: 'Sensei Martin', count: 84, status: 'Active' },
-    { id: 'DJ-02', name: 'Coastal Branch', location: 'Vytilla, Ernakulam', instructor: 'Sempai Rahul', count: 42, status: 'Active' },
-    { id: 'DJ-03', name: 'Northside Center', location: 'Aluva, Traffic Junction', instructor: 'Sempai Priya', count: 28, status: 'Maintenance' },
-    { id: 'DJ-04', name: 'Elite Combat Lab', location: 'Kakkanad, InfoPark Road', instructor: 'Sensei Martin', count: 56, status: 'Active' },
-    { id: 'DJ-05', name: 'South Training Ground', location: 'Tripunithura', instructor: 'Sempai Anand', count: 19, status: 'Active' },
-    { id: 'DJ-06', name: 'Fort Dojo', location: 'Fort Kochi', instructor: 'Sempai George', count: 31, status: 'Active' },
-  ]);
+  const [dojos, setDojos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // Operational Control States
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +20,25 @@ export default function DojosPage() {
     location: '',
     instructor: 'Sensei Martin',
   });
+
+  // fetch dojos from API
+  const fetchDojos = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/dojos');
+      const data = await res.json();
+      if (data.success) setDojos(data.data);
+      else setError('Failed to load dojos.');
+    } catch {
+      setError('Network error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => { await fetchDojos(); })();
+  }, []);
 
   // 2. Real-Time Search Filtering Logic
   const filteredDojos = dojos.filter((dojo) => {
@@ -69,35 +83,58 @@ export default function DojosPage() {
     setIsModalOpen(true);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.location) return;
+    setSubmitting(true);
+    setError('');
 
     if (editingDojo) {
-      // EXECUTE MUTATION: Update existing record matching the target ID
+      // local update only until PUT endpoint exists
       setDojos((prev) =>
         prev.map((item) =>
-          item.id === editingDojo.id ? { ...item, ...formData } : item
+          item.dojoId === editingDojo.dojoId ? { ...item, ...formData } : item
         )
       );
+      setIsModalOpen(false);
+      setSubmitting(false);
     } else {
-      // EXECUTE CREATION: Append new item object to top of array database
-      const newDojo = {
-        id: `DJ-${String(dojos.length + 1).padStart(2, '0')}`,
-        name: formData.name,
-        location: formData.location,
-        instructor: formData.instructor,
-        count: 0,
-        status: 'Active',
-      };
-      setDojos([newDojo, ...dojos]);
+      try {
+        const res = await fetch('/api/admin/dojos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        const data = await res.json();
+        if (data.success) {
+          await fetchDojos();
+          setIsModalOpen(false);
+        } else {
+          setError(data.message || 'Failed to create dojo.');
+        }
+      } catch {
+        setError('Network error.');
+      } finally {
+        setSubmitting(false);
+      }
     }
-
-    setIsModalOpen(false);
   };
+
+  if (loading) return (
+    <div className="space-y-3 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-16 rounded-xl bg-white/[0.03] border border-white/[0.05]" />
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {error && (
+        <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
       
       {/* SECTION: UPPER FUNCTIONAL TITLE FRAME */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
@@ -146,12 +183,13 @@ export default function DojosPage() {
         {currentDojos.length > 0 ? (
           <div className="divide-y divide-white/[0.04]">
             {currentDojos.map((dojo) => (
-              <div key={dojo.id} className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group">
+              // dojo._id from MongoDB
+              <div key={dojo._id} className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group">
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2.5">
                     <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{dojo.name}</h3>
                     <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded">
-                      {dojo.id}
+                      {dojo.dojoId}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-zinc-500">
@@ -229,7 +267,7 @@ export default function DojosPage() {
           <div className="w-full max-w-md bg-zinc-950 border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
-                {editingDojo ? `Modify Branch Info: ${editingDojo.id}` : 'Create New Dojo Branch'}
+                {editingDojo ? `Modify Branch Info: ${editingDojo.dojoId}` : 'Create New Dojo Branch'}
               </h2>
               <p className="text-xs text-zinc-500 mt-1">
                 {editingDojo ? 'Apply structural modifications to this registry location.' : 'Populate parameters to initialize active infrastructure tracking.'}
@@ -283,9 +321,10 @@ export default function DojosPage() {
                 </button>
                 <button
                   type="submit"
-                  className="h-10 px-5 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98]"
+                  disabled={submitting}
+                  className="h-10 px-5 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {editingDojo ? 'Save Changes' : 'Create Branch'}
+                  {submitting ? 'Saving...' : editingDojo ? 'Save Changes' : 'Create Branch'}
                 </button>
               </div>
             </form>

@@ -25,7 +25,7 @@ export async function proxy(request) {
         await jwtVerify(token, secret);
 
         return NextResponse.redirect(
-          new URL("/admin/dashboard", request.url)
+          new URL("/admin", request.url)
         );
       } catch {
         // invalid token -> continue to login page
