@@ -32,7 +32,7 @@ export default function AdminLogin() {
 
       if (data.success) {
         // Drop them cleanly into the root admin path (/admin/page.js)
-        router.push('/admin');
+        router.push('/admin/dojos');
       } else {
         setError(data.error || 'Invalid credentials');
       }
