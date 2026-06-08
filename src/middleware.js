@@ -6,6 +6,11 @@ const PUBLIC_PATHS = ["/login", "/api/auth/login"];
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  // allow root page during restructure
+  if (pathname === "/") {
+    return NextResponse.next();
+  }
+
   // allow public paths
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
