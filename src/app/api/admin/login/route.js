@@ -1,42 +1,41 @@
-import { NextResponse } from 'next/server';
+// proxy.js
 
-export async function POST(request) {
-  try {
-    const { identifier, password } = await request.json();
+import { NextResponse } from "next/server";
 
-    // 1. Hardcoded admin fallback for initial setup.
-    // Replace this later with a secure database lookup (e.g., MongoDB/Prisma)
-    const ADMIN_IDENTIFIER = process.env.ADMIN_USER || 'admin@martinskarate.com';
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'SenseiMartin2026';
+const PUBLIC_PATHS = [
+  "/admin/login",
+  "/api/admin/login",
+];
 
-    if (identifier === ADMIN_IDENTIFIER && password === ADMIN_PASSWORD) {
-      const response = NextResponse.json(
-        { success: true, message: 'Authentication successful' },
-        { status: 200 }
-      );
+export function proxy(request) {
+  const { pathname } = request.nextUrl;
 
-      // 2. Set an HTTP-Only cookie for session management
-      // In production, encrypt this token or use a JWT payload
-      response.cookies.set('admin_session', 'authenticated_secure_token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 60 * 60 * 8, // 8 hours session duration
-        path: '/',
-      });
-
-      return response;
+  // Allow public routes
+  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
+    // If already logged in, redirect from login page
+    if (pathname === "/admin/login") {
+      const session = request.cookies.get("admin_session")?.value;
+      if (session) {
+        return NextResponse.redirect(new URL("/admin", request.url));
+      }
     }
+    return NextResponse.next();
+  }
 
-    return NextResponse.json(
-      { success: false, error: 'Invalid administrative credentials' },
-      { status: 401 }
-    );
+  // Check admin session cookie
+  const session = request.cookies.get("admin_session")?.value;
 
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Internal Server Error' },
-      { status: 500 }
+  // Not logged in
+  if (!session) {
+    return NextResponse.redirect(
+      new URL("/admin/login", request.url)
     );
   }
+
+  // Logged in
+  return NextResponse.next();
 }
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};
