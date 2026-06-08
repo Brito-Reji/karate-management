@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 const studentSchema = new Schema({
+    studentId:{type:String,required:true,unique:true},
   name: { type: String, required: true },
   rollNo: { type: String, required: true, unique: true },
   dob: { type: Date },

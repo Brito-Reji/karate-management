@@ -6,8 +6,15 @@ import { NextResponse } from "next/server";
 export async function POST(request) {
   try {
     await connectDB();
-    const { name, rollNo, dob, gender, phoneNumber, fatherName, motherName, admissionDate, belt, pendingFees, image, status } = await request.json();
-    const student = new Student({ name, rollNo, dob, gender, phoneNumber, fatherName, motherName, admissionDate, belt, pendingFees, image, status });
+    const lastStudent = await Student
+      .findOne()
+      .sort({ studentId: -1 });
+
+    const nextId = lastStudent
+      ? lastStudent.studentId + 1
+      : 1001;   
+    const { name, dob, gender, phoneNumber, belt, pendingFees, image, status } = await request.json();
+    const student = new Student({ studentId: nextId, name, dob, gender, phoneNumber, belt, pendingFees, image, status,dojo });
     await student.save();
     return NextResponse.json({ success: true, student });
   } catch (error) {
