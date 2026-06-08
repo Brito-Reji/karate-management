@@ -1,20 +1,28 @@
 import connectDB from "@/lib/db";
-import Student from "@/models/Students";
+import Student from "@/models/Student";
 import { NextResponse } from "next/server";
 
 // CREATE THE STUDENT
 export async function POST(request) {
   try {
     await connectDB();
-    const lastStudent = await Student
-      .findOne()
-      .sort({ studentId: -1 });
+    const lastStudent = await Student.findOne().sort({ studentId: -1 });
 
-    const nextId = lastStudent
-      ? lastStudent.studentId + 1
-      : 1001;   
-    const { name, dob, gender, phoneNumber, belt, pendingFees, image, status } = await request.json();
-    const student = new Student({ studentId: nextId, name, dob, gender, phoneNumber, belt, pendingFees, image, status,dojo });
+    const nextId = lastStudent ? lastStudent.studentId + 1 : 1001;
+    const { name, dob, gender, phoneNumber, belt, pendingFees, image, status } =
+      await request.json();
+    const student = new Student({
+      studentId: nextId,
+      name,
+      dob,
+      gender,
+      phoneNumber,
+      belt,
+      pendingFees,
+      image,
+      status,
+      dojo,
+    });
     await student.save();
     return NextResponse.json({ success: true, student });
   } catch (error) {
@@ -27,12 +35,10 @@ export async function POST(request) {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
-
-
 
 // GET SINGLE STUDENT
 export async function GET(request, { params }) {
@@ -48,7 +54,7 @@ export async function GET(request, { params }) {
         },
         {
           status: 404,
-        }
+        },
       );
     }
     return NextResponse.json({
@@ -64,7 +70,7 @@ export async function GET(request, { params }) {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
@@ -74,8 +80,38 @@ export async function PUT(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const { name, rollNo, dob, gender, phoneNumber, fatherName, motherName, admissionDate, belt, pendingFees, image, status } = await request.json();
-    const student = await Student.findByIdAndUpdate(id, { name, rollNo, dob, gender, phoneNumber, fatherName, motherName, admissionDate, belt, pendingFees, image, status }, { new: true });
+    const {
+      name,
+      rollNo,
+      dob,
+      gender,
+      phoneNumber,
+      fatherName,
+      motherName,
+      admissionDate,
+      belt,
+      pendingFees,
+      image,
+      status,
+    } = await request.json();
+    const student = await Student.findByIdAndUpdate(
+      id,
+      {
+        name,
+        rollNo,
+        dob,
+        gender,
+        phoneNumber,
+        fatherName,
+        motherName,
+        admissionDate,
+        belt,
+        pendingFees,
+        image,
+        status,
+      },
+      { new: true },
+    );
     if (!student) {
       return NextResponse.json(
         {
@@ -84,7 +120,7 @@ export async function PUT(request, { params }) {
         },
         {
           status: 404,
-        }
+        },
       );
     }
     return NextResponse.json({
@@ -101,17 +137,21 @@ export async function PUT(request, { params }) {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
 
-// SOFT DELETE THE USER 
+// SOFT DELETE THE USER
 export async function DELETE(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const student = await Student.findByIdAndUpdate(id, { status: "Inactive" }, { new: true });
+    const student = await Student.findByIdAndUpdate(
+      id,
+      { status: "Inactive" },
+      { new: true },
+    );
     if (!student) {
       return NextResponse.json(
         {
@@ -120,7 +160,7 @@ export async function DELETE(request, { params }) {
         },
         {
           status: 404,
-        }
+        },
       );
     }
     return NextResponse.json({
@@ -137,9 +177,7 @@ export async function DELETE(request, { params }) {
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
-
-
