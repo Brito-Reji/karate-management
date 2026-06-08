@@ -1,41 +1,35 @@
-// proxy.js
+// app/api/admin/login/route.js
 
+import { SignJWT } from "jose";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/admin/login",
-  "/api/admin/login",
-];
+export async function POST(req) {
+  const { emailOrPhone, password } = await req.json();
 
-export function proxy(request) {
-  const { pathname } = request.nextUrl;
+  // Find admin in DB here
 
-  // Allow public routes
-  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
-    // If already logged in, redirect from login page
-    if (pathname === "/admin/login") {
-      const session = request.cookies.get("admin_session")?.value;
-      if (session) {
-        return NextResponse.redirect(new URL("/admin", request.url));
-      }
-    }
-    return NextResponse.next();
-  }
+  const secret = new TextEncoder().encode(
+    process.env.JWT_SECRET
+  );
 
-  // Check admin session cookie
-  const session = request.cookies.get("admin_session")?.value;
+  const token = await new SignJWT({
+    role: "admin",
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("7d")
+    .sign(secret);
 
-  // Not logged in
-  if (!session) {
-    return NextResponse.redirect(
-      new URL("/admin/login", request.url)
-    );
-  }
+  const response = NextResponse.json({
+    success: true,
+  });
 
-  // Logged in
-  return NextResponse.next();
+  response.cookies.set("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+
+  return response;
 }
-
-export const config = {
-  matcher: ["/admin/:path*"],
-};
