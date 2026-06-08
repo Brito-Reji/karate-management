@@ -1,11 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    router.push('/admin/login');
+  };
 
   // Escape Hatch: If the admin is logging in, don't show any sidebar at all
   if (pathname === '/admin/login') {
@@ -67,6 +74,15 @@ export default function AdminLayout({ children }) {
               <span className="text-xs font-medium text-zinc-300">Sensei Martin</span>
               <span className="text-[10px] text-zinc-500">Administrator</span>
             </div>
+            <button
+              onClick={() => setShowLogoutConfirm(true)}
+              title="Logout"
+              className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -96,6 +112,15 @@ export default function AdminLayout({ children }) {
               <span>{item.label}</span>
             </a>
           ))}
+          <button
+            onClick={() => { setShowLogoutConfirm(true); setIsMobileMenuOpen(false); }}
+            className="flex items-center space-x-3 px-4 h-11 rounded-lg text-sm font-medium text-zinc-500 hover:text-red-400 hover:bg-red-950/10 transition-all w-full"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Logout</span>
+          </button>
         </nav>
       </aside>
 
@@ -122,6 +147,30 @@ export default function AdminLayout({ children }) {
           </div>
         </main>
       </div>
+      {/* Logout confirmation modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)} />
+          <div className="relative w-full max-w-sm bg-zinc-950 border border-white/[0.08] rounded-2xl p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)]">
+            <h2 className="text-sm font-medium text-zinc-100">Sign out?</h2>
+            <p className="text-xs text-zinc-500 mt-1 mb-6">You will be redirected to the login page.</p>
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="h-9 px-4 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="h-9 px-5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-lg transition-all active:scale-[0.98]"
+              >
+                Yes, sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
