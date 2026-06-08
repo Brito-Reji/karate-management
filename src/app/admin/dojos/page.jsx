@@ -1,85 +1,85 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 export default function DojosPage() {
-  const [dojos, setDojos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const router     = useRouter();
+  const pathname   = usePathname();
+  const searchParams = useSearchParams();
+
+  // read from URL
+  const currentPage   = Number(searchParams.get('page'))   || 1;
+  const searchQuery   = searchParams.get('search') || '';
+
+  const [dojos, setDojos]         = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Operational Control States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDojo, setEditingDojo] = useState(null); // null = Create Mode, object = Edit Mode
+  // local input value — decoupled from URL until debounce fires
+  const [inputValue, setInputValue] = useState(searchQuery);
 
-  // Modal Form Inputs
-  const [formData, setFormData] = useState({
-    name: '',
-    location: '',
-    instructor: 'Sensei Martin',
-  });
+  const [isModalOpen, setIsModalOpen]   = useState(false);
+  const [editingDojo, setEditingDojo]   = useState(null);
+  const [formData, setFormData] = useState({ name: '', location: '', instructor: '' });
 
-  // fetch dojos from API
-  const fetchDojos = async () => {
+  // update URL helper
+  const setParams = useCallback((updates) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.push(`${pathname}?${params.toString()}`);
+  }, [searchParams, router, pathname]);
+
+  // fetch from API using URL params
+  const fetchDojos = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/dojos');
+      const res  = await fetch(`/api/admin/dojos?page=${currentPage}&search=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
-      if (data.success) setDojos(data.data);
-      else setError('Failed to load dojos.');
+      if (data.success) {
+        setDojos(data.data);
+        setTotalPages(data.totalPages);
+      } else {
+        setError('Failed to load dojos.');
+      }
     } catch {
       setError('Network error.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchQuery]);
 
   useEffect(() => {
     (async () => { await fetchDojos(); })();
-  }, []);
+  }, [fetchDojos]);
 
-  // 2. Real-Time Search Filtering Logic
-  const filteredDojos = dojos.filter((dojo) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      dojo.name.toLowerCase().includes(query) ||
-      dojo.location.toLowerCase().includes(query) ||
-      dojo.instructor.toLowerCase().includes(query)
-    );
-  });
+  // debounce: wait 1000ms after typing before pushing to URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // only push if changed
+      if (inputValue !== searchQuery) {
+        setParams({ search: inputValue, page: null });
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [inputValue]);
 
-  // 3. Dynamic Pagination Math (Calibrated precisely against filtered counts)
-  const itemsPerPage = 4;
-  const totalPages = Math.ceil(filteredDojos.length / itemsPerPage);
-  
-  // Safety fallback: if search results shrink below current page index, force clamp to page 1
-  const sanitizedCurrentPage = currentPage > totalPages ? 1 : currentPage;
-  
-  const indexOfLastItem = sanitizedCurrentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentDojos = filteredDojos.slice(indexOfFirstItem, indexOfLastItem);
-
-  // 4. Form Action Interceptors
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1); // Crucial UX step: reset to page 1 when user types a search query
-  };
+  const handleSearchChange = (e) => setInputValue(e.target.value);
 
   const openCreateModal = () => {
     setEditingDojo(null);
-    setFormData({ name: '', location: '', instructor: 'Sensei Martin' });
+    setFormData({ name: '', location: '', instructor: '' });
     setIsModalOpen(true);
   };
 
   const openEditModal = (dojo) => {
     setEditingDojo(dojo);
-    setFormData({
-      name: dojo.name,
-      location: dojo.location,
-      instructor: dojo.instructor,
-    });
+    setFormData({ name: dojo.name, location: dojo.location, instructor: dojo.instructor });
     setIsModalOpen(true);
   };
 
@@ -91,45 +91,31 @@ export default function DojosPage() {
 
     if (editingDojo) {
       try {
-        const res = await fetch(`/api/admin/dojos/${editingDojo._id}`, {
+        const res  = await fetch(`/api/admin/dojos/${editingDojo._id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
         const data = await res.json();
-        if (data.success) {
-          await fetchDojos();
-          setIsModalOpen(false);
-        } else {
-          setError(data.message || 'Failed to update dojo.');
-        }
-      } catch {
-        setError('Network error.');
-      } finally {
-        setSubmitting(false);
-      }
-
+        if (data.success) { await fetchDojos(); setIsModalOpen(false); }
+        else setError(data.message || 'Failed to update dojo.');
+      } catch { setError('Network error.'); }
+      finally  { setSubmitting(false); }
     } else {
       try {
-        const res = await fetch('/api/admin/dojos', {
+        const res  = await fetch('/api/admin/dojos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
         const data = await res.json();
-        if (data.success) {
-          await fetchDojos();
-          setIsModalOpen(false);
-        } else {
-          setError(data.message || 'Failed to create dojo.');
-        }
-      } catch {
-        setError('Network error.');
-      } finally {
-        setSubmitting(false);
-      }
+        if (data.success) { await fetchDojos(); setIsModalOpen(false); }
+        else setError(data.message || 'Failed to create dojo.');
+      } catch { setError('Network error.'); }
+      finally  { setSubmitting(false); }
     }
   };
+
 
   if (loading) return (
     <div className="space-y-3 animate-pulse">
@@ -174,14 +160,14 @@ export default function DojosPage() {
         </div>
         <input
           type="text"
-          value={searchQuery}
+          value={inputValue}
           onChange={handleSearchChange}
           placeholder="Filter by branch title, instructor name, or region..."
           className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900/50 transition-all"
         />
-        {searchQuery && (
-          <button 
-            onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+        {inputValue && (
+          <button
+            onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-600 hover:text-zinc-400 text-xs"
           >
             Clear
@@ -191,9 +177,9 @@ export default function DojosPage() {
 
       {/* SECTION: RESPONSIVE DATA REGISTRY GRID LISTING */}
       <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
-        {currentDojos.length > 0 ? (
+        {dojos.length > 0 ? (
           <div className="divide-y divide-white/[0.04]">
-            {currentDojos.map((dojo) => (
+            {dojos.map((dojo) => (
               // dojo._id from MongoDB
               <div key={dojo._id} className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group">
                 <div className="space-y-1">
@@ -249,19 +235,19 @@ export default function DojosPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-1 pt-2">
           <p className="text-[11px] text-zinc-600 font-mono">
-            Page {sanitizedCurrentPage} of {totalPages}
+            Page {currentPage} of {totalPages}
           </p>
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              disabled={sanitizedCurrentPage === 1}
+              onClick={() => setParams({ page: String(currentPage - 1) })}
+              disabled={currentPage === 1}
               className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
             >
               Previous
             </button>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              disabled={sanitizedCurrentPage === totalPages}
+              onClick={() => setParams({ page: String(currentPage + 1) })}
+              disabled={currentPage === totalPages}
               className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
             >
               Next

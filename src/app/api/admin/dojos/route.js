@@ -46,17 +46,26 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
 
-    const page = Number(searchParams.get("page")) || 1;
-    const limit = 10;
+    const page  = Number(searchParams.get("page"))  || 1;
+    const limit = Number(searchParams.get("limit")) || 4;
+    const search = searchParams.get("search")?.trim() || "";
+
+    const filter = search
+      ? {
+          $or: [
+            { name:       { $regex: search, $options: "i" } },
+            { location:   { $regex: search, $options: "i" } },
+            { instructor: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
 
     const skip = (page - 1) * limit;
 
-    const dojos = await Dojo.find()
-      .skip(skip)
-      .limit(limit)
-      .sort({ createdAt: -1 });
-
-    const total = await Dojo.countDocuments();
+    const [dojos, total] = await Promise.all([
+      Dojo.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Dojo.countDocuments(filter),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -66,14 +75,7 @@ export async function GET(request) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-      },
-      {
-        status: 500,
-      }
-    );
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }
 
