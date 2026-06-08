@@ -90,14 +90,25 @@ export default function DojosPage() {
     setError('');
 
     if (editingDojo) {
-      // local update only until PUT endpoint exists
-      setDojos((prev) =>
-        prev.map((item) =>
-          item.dojoId === editingDojo.dojoId ? { ...item, ...formData } : item
-        )
-      );
-      setIsModalOpen(false);
-      setSubmitting(false);
+      try {
+        const res = await fetch(`/api/admin/dojos/${editingDojo._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        const data = await res.json();
+        if (data.success) {
+          await fetchDojos();
+          setIsModalOpen(false);
+        } else {
+          setError(data.message || 'Failed to update dojo.');
+        }
+      } catch {
+        setError('Network error.');
+      } finally {
+        setSubmitting(false);
+      }
+
     } else {
       try {
         const res = await fetch('/api/admin/dojos', {
