@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 export async function POST(req) {
   await connectDB();
   const { identifier, password } = await req.json();
-  console.log(identifier, password);
+ 
 
   // Find admin in DB here
   let user = await User.findOne({
