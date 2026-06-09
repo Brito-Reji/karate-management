@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
+import useDebounce from '@/hooks/useDebounce';
+import { useSearchDojos } from '@/hooks/useSearchDojos';
 
 // skeleton shown during loading
 function SkeletonRows() {
@@ -41,11 +43,33 @@ function DojosContent() {
   const [formData, setFormData] = useState({ name: '', location: '', instructor: '' });
   const [formError, setFormError] = useState('');
 
-  // server state
-  const { data, isLoading, isError, error, isFetching, isStale } = useDojos(currentPage, searchQuery);
+  const debouncedSearch = useDebounce(inputValue, 300);
+  const isSearchActive = debouncedSearch.trim().length >= 2;
 
-  const dojos      = data?.data       ?? [];
-  const totalPages = data?.totalPages ?? 1;
+  const {
+    data: searchData,
+    isLoading: isSearchLoading,
+    isError: isSearchError,
+    error: searchError,
+    isFetching: isSearchFetching,
+  } = useSearchDojos(debouncedSearch);
+
+  const {
+    data: listData,
+    isLoading: isListLoading,
+    isError: isListError,
+    error: listError,
+    isFetching: isListFetching,
+    isStale: isListStale,
+  } = useDojos(currentPage, isSearchActive ? "" : searchQuery, !isSearchActive);
+
+  const dojos = isSearchActive ? (searchData?.data ?? []) : (listData?.data ?? []);
+  const totalPages = isSearchActive ? 1 : (listData?.totalPages ?? 1);
+  const isLoading = isSearchActive ? isSearchLoading : isListLoading;
+  const isError = isSearchActive ? isSearchError : isListError;
+  const error = isSearchActive ? searchError : listError;
+  const isFetching = isSearchActive ? isSearchFetching : isListFetching;
+  const isStale = isSearchActive ? false : isListStale;
 
   const createDojo = useCreateDojo();
   const updateDojo = useUpdateDojo();
@@ -59,13 +83,11 @@ function DojosContent() {
     router.push(`${pathname}?${params.toString()}`);
   }, [searchParams, router, pathname]);
 
-  // debounce input → URL
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (inputValue !== searchQuery) setParams({ search: inputValue, page: null });
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [inputValue]); // eslint-disable-line
+    if (debouncedSearch !== searchQuery) {
+      setParams({ search: debouncedSearch || null, page: null });
+    }
+  }, [debouncedSearch, searchQuery, setParams]);
 
   const openCreateModal = () => {
     setEditingDojo(null);

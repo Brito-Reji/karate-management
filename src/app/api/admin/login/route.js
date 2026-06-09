@@ -12,7 +12,7 @@ export async function POST(req) {
 
   // Find admin in DB here
   let user = await User.findOne({
-    $or: [{ email: identifier }, { phoneNumber: identifier }],
+    $or: [{ email: identifier }, { phone: identifier }],
   });
 console.log(user);
   if (!user || !(password ===user.password)) {

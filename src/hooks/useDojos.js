@@ -11,10 +11,11 @@ import {
 
 // --- queries ---
 
-export function useDojos(page, search) {
+export function useDojos(page, search, enabled = true) {
   return useQuery({
     ...dojoListQuery(page, search),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

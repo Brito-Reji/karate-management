@@ -13,6 +13,14 @@ export async function fetchDojos({ page = 1, search = '' } = {}) {
   return json; // { data, total, page, totalPages }
 }
 
+export async function fetchSearchDojos(query) {
+  const res = await fetch(`/api/admin/dojos/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error("Failed to search dojos");
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || "Failed to search dojos");
+  return json;
+}
+
 export async function fetchDojo(id) {
   const res = await fetch(`/api/admin/dojos/${id}`);
   if (!res.ok) throw new Error('Dojo not found');
