@@ -104,14 +104,6 @@ function DojosContent() {
 
   const isSubmitting = createDojo.isPending || updateDojo.isPending;
 
-  if (isLoading) return <SkeletonRows />;
-
-  if (isError) return (
-    <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
-      {error.message}
-    </div>
-  );
-
   return (
     <div className="space-y-6 animate-fadeIn">
 
@@ -164,96 +156,108 @@ function DojosContent() {
       </div>
 
       {/* SECTION: RESPONSIVE DATA REGISTRY GRID LISTING */}
-      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
-        {dojos.length > 0 ? (
-          <div className="divide-y divide-white/[0.04]">
-            {dojos.map((dojo) => (
-              <div
-                key={dojo._id}
-                className={`p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group ${
-                  dojo._id === '__optimistic__' ? 'opacity-50' : ''
-                }`}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2.5">
-                    <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{dojo.name}</h3>
-                    <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded">
-                      {dojo.dojoId ?? '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-zinc-500">
-                    <span className="text-zinc-400 font-medium">{dojo.instructor}</span>
-                    <span>•</span>
-                    <span className="truncate max-w-[200px] sm:max-w-none">{dojo.location}</span>
-                  </div>
-                </div>
+      {isLoading ? (
+        <SkeletonRows />
+      ) : isError ? (
+        <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
+          {error.message}
+        </div>
+      ) : (
+        <>
+          <div className={`bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
+            isFetching ? 'opacity-60' : 'opacity-100'
+          }`}>
+            {dojos.length > 0 ? (
+              <div className="divide-y divide-white/[0.04]">
+                {dojos.map((dojo) => (
+                  <div
+                    key={dojo._id}
+                    className={`p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group ${
+                      dojo._id === '__optimistic__' ? 'opacity-50' : ''
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2.5">
+                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{dojo.name}</h3>
+                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded">
+                          {dojo.dojoId ?? '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-zinc-500">
+                        <span className="text-zinc-400 font-medium">{dojo.instructor}</span>
+                        <span>•</span>
+                        <span className="truncate max-w-[200px] sm:max-w-none">{dojo.location}</span>
+                      </div>
+                    </div>
 
-                <div className="flex items-center justify-between sm:justify-end space-x-6 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0">
-                  <div className="text-left sm:text-right hidden xs:block">
-                    <span className="text-xs font-mono text-zinc-300 font-medium">{dojo.count ?? 0}</span>
-                    <span className="text-[10px] text-zinc-600 block sm:inline sm:ml-1">Students</span>
-                  </div>
+                    <div className="flex items-center justify-between sm:justify-end space-x-6 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0">
+                      <div className="text-left sm:text-right hidden xs:block">
+                        <span className="text-xs font-mono text-zinc-300 font-medium">{dojo.count ?? 0}</span>
+                        <span className="text-[10px] text-zinc-600 block sm:inline sm:ml-1">Students</span>
+                      </div>
 
-                  <div className="flex items-center space-x-4 ml-auto sm:ml-0">
-                    <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
-                      dojo.status === 'Active'
-                        ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-500'
-                    }`}>
-                      {dojo.status ?? 'Active'}
-                    </span>
+                      <div className="flex items-center space-x-4 ml-auto sm:ml-0">
+                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
+                          dojo.status === 'Active'
+                            ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                        }`}>
+                          {dojo.status ?? 'Active'}
+                        </span>
 
-                    <button
-                      onClick={() => openEditModal(dojo)}
-                      disabled={dojo._id === '__optimistic__'}
-                      className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-7 px-3 rounded-md disabled:opacity-40"
-                    >
-                      Edit
-                    </button>
+                        <button
+                          onClick={() => openEditModal(dojo)}
+                          disabled={dojo._id === '__optimistic__'}
+                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-7 px-3 rounded-md disabled:opacity-40"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          // empty state
-          <div className="p-12 text-center space-y-2">
-            <p className="text-xs text-zinc-600 font-mono">No active dojo profiles match your search filter criteria.</p>
-            {searchQuery && (
-              <button
-                onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
-                className="text-[11px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-              >
-                Clear filter
-              </button>
+            ) : (
+              // empty state
+              <div className="p-12 text-center space-y-2">
+                <p className="text-xs text-zinc-600 font-mono">No active dojo profiles match your search filter criteria.</p>
+                {searchQuery && (
+                  <button
+                    onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
+                    className="text-[11px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      {/* SECTION: MINIMALIST PAGINATION CONTROLS */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1 pt-2">
-          <p className="text-[11px] text-zinc-600 font-mono">
-            Page {currentPage} of {totalPages}
-          </p>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setParams({ page: String(currentPage - 1) })}
-              disabled={currentPage === 1}
-              className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setParams({ page: String(currentPage + 1) })}
-              disabled={currentPage === totalPages}
-              className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+          {/* SECTION: MINIMALIST PAGINATION CONTROLS */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-1 pt-2">
+              <p className="text-[11px] text-zinc-600 font-mono">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setParams({ page: String(currentPage - 1) })}
+                  disabled={currentPage === 1 || isFetching}
+                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setParams({ page: String(currentPage + 1) })}
+                  disabled={currentPage === totalPages || isFetching}
+                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* SECTION: UNIFIED DATA MUTATION MODAL OVERLAY */}

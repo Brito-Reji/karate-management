@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   studentListQuery,
@@ -13,7 +13,10 @@ import {
 // --- queries ---
 
 export function useStudents(page, search, filters) {
-  return useQuery(studentListQuery(page, search, filters));
+  return useQuery({
+    ...studentListQuery(page, search, filters),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useStudent(id) {

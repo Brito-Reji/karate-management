@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   dojoListQuery,
@@ -12,7 +12,10 @@ import {
 // --- queries ---
 
 export function useDojos(page, search) {
-  return useQuery(dojoListQuery(page, search));
+  return useQuery({
+    ...dojoListQuery(page, search),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useDojo(id) {
