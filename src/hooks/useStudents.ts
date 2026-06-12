@@ -3,6 +3,10 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
+  type Student,
+  type StudentFilters,
+  type StudentInput,
+  type StudentListResponse,
   studentListQuery,
   studentDetailQuery,
   createStudent,
@@ -12,14 +16,14 @@ import {
 
 // --- queries ---
 
-export function useStudents(page, search, filters) {
+export function useStudents(page: number, search: string, filters: StudentFilters) {
   return useQuery({
     ...studentListQuery(page, search, filters),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useStudent(id) {
+export function useStudent(id: string) {
   return useQuery(studentDetailQuery(id));
 }
 
@@ -31,12 +35,12 @@ export function useCreateStudent() {
   return useMutation({
     mutationFn: createStudent,
 
-    onMutate: async (newStudent) => {
+    onMutate: async (newStudent: StudentInput) => {
       await qc.cancelQueries({ queryKey: queryKeys.students.all() });
 
       const snapshot = qc.getQueriesData({ queryKey: queryKeys.students.all() });
 
-      qc.setQueriesData({ queryKey: queryKeys.students.all() }, (old) => {
+      qc.setQueriesData<StudentListResponse>({ queryKey: queryKeys.students.all() }, (old) => {
         if (!old?.students) return old;
         return {
           ...old,
@@ -63,14 +67,14 @@ export function useUpdateStudent() {
   return useMutation({
     mutationFn: updateStudent,
 
-    onMutate: async ({ id, ...patch }) => {
+    onMutate: async ({ id, ...patch }: StudentInput & { id: string }) => {
       await qc.cancelQueries({ queryKey: queryKeys.students.all() });
       await qc.cancelQueries({ queryKey: queryKeys.students.detail(id) });
 
       const prevList   = qc.getQueriesData({ queryKey: queryKeys.students.all() });
-      const prevDetail = qc.getQueryData(queryKeys.students.detail(id));
+      const prevDetail = qc.getQueryData<Student>(queryKeys.students.detail(id));
 
-      qc.setQueriesData({ queryKey: queryKeys.students.all() }, (old) => {
+      qc.setQueriesData<StudentListResponse>({ queryKey: queryKeys.students.all() }, (old) => {
         if (!old?.students) return old;
         return {
           ...old,
@@ -78,7 +82,7 @@ export function useUpdateStudent() {
         };
       });
 
-      qc.setQueryData(queryKeys.students.detail(id), (old) =>
+      qc.setQueryData<Student>(queryKeys.students.detail(id), (old) =>
         old ? { ...old, ...patch } : old
       );
 
@@ -105,12 +109,12 @@ export function useDeleteStudent() {
     mutationFn: deleteStudent,
 
     // optimistic: flip status to Inactive instantly
-    onMutate: async (id) => {
+    onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: queryKeys.students.all() });
 
       const prevList = qc.getQueriesData({ queryKey: queryKeys.students.all() });
 
-      qc.setQueriesData({ queryKey: queryKeys.students.all() }, (old) => {
+      qc.setQueriesData<StudentListResponse>({ queryKey: queryKeys.students.all() }, (old) => {
         if (!old?.students) return old;
         return {
           ...old,

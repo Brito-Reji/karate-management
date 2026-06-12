@@ -3,6 +3,9 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
+  type Dojo,
+  type DojoInput,
+  type DojoListResponse,
   dojoListQuery,
   dojoDetailQuery,
   createDojo,
@@ -11,7 +14,7 @@ import {
 
 // --- queries ---
 
-export function useDojos(page, search, enabled = true) {
+export function useDojos(page: number, search: string, enabled = true) {
   return useQuery({
     ...dojoListQuery(page, search),
     placeholderData: keepPreviousData,
@@ -19,7 +22,7 @@ export function useDojos(page, search, enabled = true) {
   });
 }
 
-export function useDojo(id) {
+export function useDojo(id: string) {
   return useQuery(dojoDetailQuery(id));
 }
 
@@ -32,12 +35,12 @@ export function useCreateDojo() {
     mutationFn: createDojo,
 
     // optimistic: add a temp row immediately
-    onMutate: async (newDojo) => {
+    onMutate: async (newDojo: DojoInput) => {
       await qc.cancelQueries({ queryKey: queryKeys.dojos.all() });
 
       const snapshot = qc.getQueriesData({ queryKey: queryKeys.dojos.all() });
 
-      qc.setQueriesData({ queryKey: queryKeys.dojos.all() }, (old) => {
+      qc.setQueriesData<DojoListResponse>({ queryKey: queryKeys.dojos.all() }, (old) => {
         if (!old?.data) return old;
         return {
           ...old,
@@ -67,15 +70,15 @@ export function useUpdateDojo() {
     mutationFn: updateDojo,
 
     // optimistic: patch the list and detail cache in place
-    onMutate: async ({ id, ...patch }) => {
+    onMutate: async ({ id, ...patch }: DojoInput & { id: string }) => {
       await qc.cancelQueries({ queryKey: queryKeys.dojos.all() });
       await qc.cancelQueries({ queryKey: queryKeys.dojos.detail(id) });
 
       const prevList   = qc.getQueriesData({ queryKey: queryKeys.dojos.all() });
-      const prevDetail = qc.getQueryData(queryKeys.dojos.detail(id));
+      const prevDetail = qc.getQueryData<Dojo>(queryKeys.dojos.detail(id));
 
       // patch every cached list page
-      qc.setQueriesData({ queryKey: queryKeys.dojos.all() }, (old) => {
+      qc.setQueriesData<DojoListResponse>({ queryKey: queryKeys.dojos.all() }, (old) => {
         if (!old?.data) return old;
         return {
           ...old,
@@ -84,7 +87,7 @@ export function useUpdateDojo() {
       });
 
       // patch the detail cache if present
-      qc.setQueryData(queryKeys.dojos.detail(id), (old) =>
+      qc.setQueryData<Dojo>(queryKeys.dojos.detail(id), (old) =>
         old ? { ...old, ...patch } : old
       );
 

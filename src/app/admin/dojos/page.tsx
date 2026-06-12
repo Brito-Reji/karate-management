@@ -74,7 +74,7 @@ function DojosContent() {
   const createDojo = useCreateDojo();
   const updateDojo = useUpdateDojo();
 
-  const setParams = useCallback((updates) => {
+  const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([k, v]) => {
       if (v) params.set(k, v);

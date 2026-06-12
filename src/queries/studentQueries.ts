@@ -1,9 +1,49 @@
 // student API functions — colocated with the domain
 import { queryKeys } from '@/lib/queryKeys';
 
+export type Student = {
+  _id: string;
+  studentId?: string;
+  name?: string;
+  rollNo?: string;
+  dob?: string;
+  gender?: "Male" | "Female" | "Other";
+  phoneNumber?: string;
+  fatherName?: string;
+  motherName?: string;
+  admissionDate?: string;
+  belt?: string;
+  pendingFees?: number;
+  image?: string;
+  status?: "Active" | "Inactive";
+};
+
+export type StudentInput = Omit<Student, "_id">;
+
+export type StudentFilters = Record<string, string>;
+
+type StudentListParams = {
+  page?: number;
+  search?: string;
+  [key: string]: string | number | undefined;
+};
+
+export type StudentListResponse = {
+  success: boolean;
+  students: Student[];
+  total?: number;
+  page?: number;
+  totalPages?: number;
+  message?: string;
+};
+
 // --- fetchers ---
 
-export async function fetchStudents({ page = 1, search = '', ...filters } = {}) {
+export async function fetchStudents({
+  page = 1,
+  search = '',
+  ...filters
+}: StudentListParams = {}): Promise<StudentListResponse> {
   const params = new URLSearchParams({
     page:   String(page),
     search: search,
@@ -16,7 +56,7 @@ export async function fetchStudents({ page = 1, search = '', ...filters } = {}) 
   return json; // { students, total, page, totalPages }
 }
 
-export async function fetchStudent(id) {
+export async function fetchStudent(id: string): Promise<Student> {
   const res = await fetch(`/api/students/${id}`);
   if (!res.ok) throw new Error('Student not found');
   const json = await res.json();
@@ -26,12 +66,12 @@ export async function fetchStudent(id) {
 
 // --- query options ---
 
-export const studentListQuery = (page, search, filters = {}) => ({
+export const studentListQuery = (page: number, search: string, filters: StudentFilters = {}) => ({
   queryKey: queryKeys.students.list(page, search, filters),
   queryFn:  () => fetchStudents({ page, search, ...filters }),
 });
 
-export const studentDetailQuery = (id) => ({
+export const studentDetailQuery = (id: string) => ({
   queryKey: queryKeys.students.detail(id),
   queryFn:  () => fetchStudent(id),
   enabled:  !!id,
@@ -39,7 +79,7 @@ export const studentDetailQuery = (id) => ({
 
 // --- mutation functions ---
 
-export async function createStudent(data) {
+export async function createStudent(data: StudentInput): Promise<Student> {
   const res = await fetch('/api/students', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,7 +91,7 @@ export async function createStudent(data) {
   return json.student;
 }
 
-export async function updateStudent({ id, ...data }) {
+export async function updateStudent({ id, ...data }: StudentInput & { id: string }): Promise<Student> {
   const res = await fetch(`/api/students/${id}`, {
     method:  'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -63,7 +103,7 @@ export async function updateStudent({ id, ...data }) {
   return json.student;
 }
 
-export async function deleteStudent(id) {
+export async function deleteStudent(id: string): Promise<Student> {
   const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to deactivate student');
   const json = await res.json();

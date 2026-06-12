@@ -3,18 +3,18 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { SignJWT } from "jose";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function POST(req) {
+export async function POST(req: NextRequest) {
   await connectDB();
   const { identifier, password } = await req.json();
  
 
   // Find admin in DB here
-  let user = await User.findOne({
+  const user = await User.findOne({
     $or: [{ email: identifier }, { phone: identifier }],
   });
-console.log(user);
+
   if (!user || !(password ===user.password)) {
     return NextResponse.json(
       { success: false, error: "Invalid credentials" },

@@ -1,6 +1,13 @@
-// models/Dojo.js
+// models/Dojo.ts
 
-import mongoose from "mongoose";
+import mongoose, { type Model } from "mongoose";
+
+export type DojoDocument = {
+  dojoId: string;
+  name: string;
+  location: string;
+  instructor?: string;
+};
 
 const dojoSchema = new mongoose.Schema(
   {
@@ -30,5 +37,8 @@ const dojoSchema = new mongoose.Schema(
   }
 );
 
-export default mongoose.models.Dojo ||
-  mongoose.model("Dojo", dojoSchema);
+const Dojo =
+  (mongoose.models.Dojo as Model<DojoDocument> | undefined) ||
+  mongoose.model<DojoDocument>("Dojo", dojoSchema);
+
+export default Dojo;

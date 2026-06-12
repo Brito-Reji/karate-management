@@ -1,6 +1,24 @@
-import mongoose from "mongoose";
+import mongoose, { type Model } from "mongoose";
 
 const { Schema } = mongoose;
+
+export type StudentDocument = {
+  studentId: string;
+  name: string;
+  rollNo: string;
+  dob?: Date;
+  gender?: "Male" | "Female" | "Other";
+  phoneNumber: string;
+  fatherName?: string;
+  motherName?: string;
+  admissionDate?: Date;
+  belt: string;
+  pendingFees?: number;
+  image?: string;
+  status?: "Active" | "Inactive";
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 const studentSchema = new Schema({
     studentId:{type:String,required:true,unique:true},
@@ -20,5 +38,8 @@ const studentSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.models.Student ||
-  mongoose.model("Student", studentSchema);
+const Student =
+  (mongoose.models.Student as Model<StudentDocument> | undefined) ||
+  mongoose.model<StudentDocument>("Student", studentSchema);
+
+export default Student;

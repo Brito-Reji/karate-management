@@ -1,5 +1,17 @@
-import mongoose from "mongoose";
+import mongoose, { type Model } from "mongoose";
 const { Schema } = mongoose;
+
+export type UserDocument = {
+  name: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+  role: "admin" | "instructor" | "student";
+  isBlocked?: boolean;
+  refreshToken?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 const userSchema = new Schema({
     name: { type: String, required: true },
@@ -13,5 +25,8 @@ const userSchema = new Schema({
     updatedAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.models.User ||
-    mongoose.model("User", userSchema);
+const User =
+  (mongoose.models.User as Model<UserDocument> | undefined) ||
+  mongoose.model<UserDocument>("User", userSchema);
+
+export default User;

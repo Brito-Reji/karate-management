@@ -21,7 +21,6 @@ export async function POST(request) {
       pendingFees,
       image,
       status,
-      dojo,
     });
     await student.save();
     return NextResponse.json({ success: true, student });
