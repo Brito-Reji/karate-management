@@ -6,6 +6,7 @@ export type DojoDocument = {
   dojoId: string;
   name: string;
   location: string;
+  instructors?: string[];
   instructor?: string;
 };
 
@@ -30,6 +31,10 @@ const dojoSchema = new mongoose.Schema(
     instructor:{
       type:String,
       trim: true,
+    },
+    instructors: {
+      type: [String],
+      default: [],
     },
   },
   {

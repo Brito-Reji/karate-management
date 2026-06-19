@@ -56,9 +56,19 @@ export async function GET(request) {
       },
     ]);
 
+    const mappedDojos = dojos.map((dojo) => {
+      const d = { ...dojo };
+      if (!d.instructors || d.instructors.length === 0) {
+        d.instructors = d.instructor
+          ? d.instructor.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+      }
+      return d;
+    });
+
     return NextResponse.json({
       success: true,
-      data: dojos,
+      data: mappedDojos,
     });
   } catch (error) {
     return NextResponse.json(

@@ -40,7 +40,7 @@ function DojosContent() {
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingDojo, setEditingDojo]   = useState(null);
-  const [formData, setFormData] = useState({ name: '', location: '', instructor: '' });
+  const [formData, setFormData] = useState({ name: '', location: '', instructors: [''] });
   const [formError, setFormError] = useState('');
 
   const debouncedSearch = useDebounce(inputValue, 300);
@@ -91,14 +91,23 @@ function DojosContent() {
 
   const openCreateModal = () => {
     setEditingDojo(null);
-    setFormData({ name: '', location: '', instructor: '' });
+    setFormData({ name: '', location: '', instructors: [''] });
     setFormError('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (dojo) => {
     setEditingDojo(dojo);
-    setFormData({ name: dojo.name, location: dojo.location, instructor: dojo.instructor });
+    // split legacy instructors
+    const parsedInstructors = dojo.instructors && dojo.instructors.length > 0
+      ? [...dojo.instructors]
+      : (dojo.instructor ? dojo.instructor.split(',').map((s) => s.trim()).filter(Boolean) : []);
+
+    setFormData({
+      name: dojo.name,
+      location: dojo.location,
+      instructors: parsedInstructors.length > 0 ? parsedInstructors : [''],
+    });
     setFormError('');
     setIsModalOpen(true);
   };
@@ -108,16 +117,28 @@ function DojosContent() {
     if (!formData.name || !formData.location) return;
     setFormError('');
 
+    const cleanedInstructors = formData.instructors.map((i) => i.trim()).filter(Boolean);
+    if (cleanedInstructors.length === 0) {
+      setFormError('Please add at least one instructor.');
+      return;
+    }
+
+    const payload = {
+      name: formData.name,
+      location: formData.location,
+      instructors: cleanedInstructors,
+    };
+
     if (editingDojo) {
       updateDojo.mutate(
-        { id: editingDojo._id, ...formData },
+        { id: editingDojo._id, ...payload },
         {
           onSuccess: () => setIsModalOpen(false),
           onError:   (err) => setFormError(err.message),
         }
       );
     } else {
-      createDojo.mutate(formData, {
+      createDojo.mutate(payload, {
         onSuccess: () => setIsModalOpen(false),
         onError:   (err) => setFormError(err.message),
       });
@@ -206,7 +227,11 @@ function DojosContent() {
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-zinc-500">
-                        <span className="text-zinc-400 font-medium">{dojo.instructor}</span>
+                        <span className="text-zinc-400 font-medium">
+                          {dojo.instructors && dojo.instructors.length > 0
+                            ? dojo.instructors.join(", ")
+                            : (dojo.instructor || '—')}
+                        </span>
                         <span>•</span>
                         <span className="truncate max-w-[200px] sm:max-w-none">{dojo.location}</span>
                       </div>
@@ -330,16 +355,56 @@ function DojosContent() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Assigned Chief Instructor</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.instructor}
-                  onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                  placeholder="Sensei Martin"
-                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
-                />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Assigned Instructors</label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      instructors: [...formData.instructors, '']
+                    })}
+                    className="text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors flex items-center space-x-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
+                    </svg>
+                    <span>Add Instructor</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                  {formData.instructors.map((inst, index) => (
+                    <div key={index} className="flex items-center space-x-2 animate-fadeIn">
+                      <input
+                        type="text"
+                        required
+                        value={inst}
+                        onChange={(e) => {
+                          const updated = [...formData.instructors];
+                          updated[index] = e.target.value;
+                          setFormData({ ...formData, instructors: updated });
+                        }}
+                        placeholder={`Sensei Name ${index + 1}`}
+                        className="flex-1 h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
+                      />
+                      {formData.instructors.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = formData.instructors.filter((_, idx) => idx !== index);
+                            setFormData({ ...formData, instructors: updated });
+                          }}
+                          className="h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/20 hover:bg-red-950/20 hover:border-red-500/20 hover:text-red-400 text-zinc-500 transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-2">

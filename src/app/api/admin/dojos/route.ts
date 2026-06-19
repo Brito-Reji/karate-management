@@ -9,16 +9,23 @@ export async function POST(request) {
   try {
     await connectDB();
 
-    const { name, location, instructor } = await request.json();
+    const { name, location, instructor, instructors } = await request.json();
 
     // auto-generate dojoId like DJ-01, DJ-02 ...
     const count = await Dojo.countDocuments();
     const dojoId = `DJ-${String(count + 1).padStart(2, '0')}`;
 
+    const finalInstructors = Array.isArray(instructors)
+      ? instructors.filter(Boolean)
+      : (instructor ? [instructor] : []);
+
+    const finalInstructor = finalInstructors.join(", ");
+
     const dojo = await Dojo.create({
       name,
       location,
-      instructor,
+      instructor: finalInstructor,
+      instructors: finalInstructors,
       dojoId,
     });
 
@@ -53,9 +60,10 @@ export async function GET(request) {
     const filter = search
       ? {
           $or: [
-            { name:       { $regex: search, $options: "i" } },
-            { location:   { $regex: search, $options: "i" } },
-            { instructor: { $regex: search, $options: "i" } },
+            { name:        { $regex: search, $options: "i" } },
+            { location:    { $regex: search, $options: "i" } },
+            { instructor:  { $regex: search, $options: "i" } },
+            { instructors: { $regex: search, $options: "i" } },
           ],
         }
       : {};
@@ -67,9 +75,19 @@ export async function GET(request) {
       Dojo.countDocuments(filter),
     ]);
 
+    const mappedDojos = dojos.map((dojo) => {
+      const d = dojo.toObject();
+      if (!d.instructors || d.instructors.length === 0) {
+        d.instructors = d.instructor
+          ? d.instructor.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+      }
+      return d;
+    });
+
     return NextResponse.json({
       success: true,
-      data: dojos,
+      data: mappedDojos,
       total,
       page,
       totalPages: Math.ceil(total / limit),
