@@ -4,11 +4,12 @@ import Dojo from "@/models/Dojo";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-    const dojo = await Dojo.findOne({ dojoId: params.id });
+    const { id } = await params;
+    const dojo = await Dojo.findOne({ dojoId: id });
 
     if (!dojo) {
       return NextResponse.json(
