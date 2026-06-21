@@ -17,6 +17,11 @@ export default function AdminDashboard() {
       desc: 'View and manage enrolled student records.',
       href: '/admin/students',
     },
+    {
+      label: 'Belt Tests',
+      desc: 'Record belt promotions and view progression history.',
+      href: '/admin/tests',
+    },
   ];
 
   return (

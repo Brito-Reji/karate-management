@@ -5,7 +5,7 @@ const { Schema } = mongoose;
 export type StudentDocument = {
   studentId: string;
   name: string;
-  rollNo: string;
+  dojoId?: string;
   dob?: Date;
   gender?: "Male" | "Female" | "Other";
   phoneNumber: string;
@@ -21,12 +21,12 @@ export type StudentDocument = {
 };
 
 const studentSchema = new Schema({
-    studentId:{type:String,required:true,unique:true},
+  studentId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
-  rollNo: { type: String, required: true, unique: true },
+  dojoId: { type: String },
   dob: { type: Date },
   gender: { type: String, enum: ["Male", "Female", "Other"] },
-  phoneNumber: { type: String,required:true },
+  phoneNumber: { type: String, required: true },
   fatherName: { type: String },
   motherName: { type: String },
   admissionDate: { type: Date, default: Date.now },
