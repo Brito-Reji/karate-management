@@ -2,44 +2,7 @@ import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import { NextResponse } from "next/server";
 
-// CREATE THE STUDENT
-export async function POST(request) {
-  try {
-    await connectDB();
-    const lastStudent = await Student.findOne().sort({ studentId: -1 });
-
-    const nextId = lastStudent ? lastStudent.studentId + 1 : 1001;
-    const { name, dob, gender, phoneNumber, belt, pendingFees, image, status } =
-      await request.json();
-    const student = new Student({
-      studentId: nextId,
-      name,
-      dob,
-      gender,
-      phoneNumber,
-      belt,
-      pendingFees,
-      image,
-      status,
-    });
-    await student.save();
-    return NextResponse.json({ success: true, student });
-  } catch (error) {
-    console.log(error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to create student",
-        error: error.message,
-      },
-      {
-        status: 500,
-      },
-    );
-  }
-}
-
-// GET SINGLE STUDENT
+// GET single student
 export async function GET(request, { params }) {
   try {
     await connectDB();
@@ -47,41 +10,27 @@ export async function GET(request, { params }) {
     const student = await Student.findById(id);
     if (!student) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Student not found",
-        },
-        {
-          status: 404,
-        },
+        { success: false, message: "Student not found" },
+        { status: 404 }
       );
     }
-    return NextResponse.json({
-      success: true,
-      student,
-    });
+    return NextResponse.json({ success: true, student });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to get student",
-        error: error.message,
-      },
-      {
-        status: 500,
-      },
+      { success: false, message: "Failed to get student", error: error.message },
+      { status: 500 }
     );
   }
 }
 
-// UPDATE STUDENT
+// UPDATE student
 export async function PUT(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
     const {
       name,
-      rollNo,
+      dojoId,
       dob,
       gender,
       phoneNumber,
@@ -93,11 +42,12 @@ export async function PUT(request, { params }) {
       image,
       status,
     } = await request.json();
+
     const student = await Student.findByIdAndUpdate(
       id,
       {
         name,
-        rollNo,
+        dojoId,
         dob,
         gender,
         phoneNumber,
@@ -108,40 +58,27 @@ export async function PUT(request, { params }) {
         pendingFees,
         image,
         status,
+        updatedAt: new Date(),
       },
-      { new: true },
+      { new: true }
     );
+
     if (!student) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Student not found",
-        },
-        {
-          status: 404,
-        },
+        { success: false, message: "Student not found" },
+        { status: 404 }
       );
     }
-    return NextResponse.json({
-      success: true,
-      message: "Student updated successfully",
-      student,
-    });
+    return NextResponse.json({ success: true, message: "Student updated successfully", student });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to update student",
-        error: error.message,
-      },
-      {
-        status: 500,
-      },
+      { success: false, message: "Failed to update student", error: error.message },
+      { status: 500 }
     );
   }
 }
 
-// SOFT DELETE THE USER
+// SOFT DELETE
 export async function DELETE(request, { params }) {
   try {
     await connectDB();
@@ -149,34 +86,19 @@ export async function DELETE(request, { params }) {
     const student = await Student.findByIdAndUpdate(
       id,
       { status: "Inactive" },
-      { new: true },
+      { new: true }
     );
     if (!student) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Student not found",
-        },
-        {
-          status: 404,
-        },
+        { success: false, message: "Student not found" },
+        { status: 404 }
       );
     }
-    return NextResponse.json({
-      success: true,
-      message: "Student deleted successfully",
-      student,
-    });
+    return NextResponse.json({ success: true, message: "Student deleted successfully", student });
   } catch (error) {
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to delete student",
-        error: error.message,
-      },
-      {
-        status: 500,
-      },
+      { success: false, message: "Failed to delete student", error: error.message },
+      { status: 500 }
     );
   }
 }
