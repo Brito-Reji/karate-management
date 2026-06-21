@@ -6,6 +6,7 @@ import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } fro
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
+import SearchableSelect from '@/components/SearchableSelect';
 
 function SkeletonRows() {
   return (
@@ -47,6 +48,8 @@ function StudentsContent() {
 
   const currentPage = Number(searchParams.get('page')) || 1;
   const searchQuery = searchParams.get('search') || '';
+  const selectedBelt = searchParams.get('belt') || '';
+  const selectedDojoId = searchParams.get('dojoId') || '';
 
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,7 +72,7 @@ function StudentsContent() {
     isError,
     error,
     isFetching,
-  } = useStudents(currentPage, debouncedSearch, {});
+  } = useStudents(currentPage, debouncedSearch, { belt: selectedBelt, dojoId: selectedDojoId });
 
   const { data: dojos = [] } = useAllDojos();
 
@@ -150,6 +153,17 @@ function StudentsContent() {
 
   const isSubmitting = createStudent.isPending || updateStudent.isPending;
 
+  const dojoOptions = dojos.map((dojo) => ({
+    value: dojo._id,
+    label: `${dojo.name} — ${dojo.location}`,
+  }));
+
+  const beltOptions = BELTS.map((b) => ({
+    value: b.name,
+    label: b.name,
+    dotColor: b.color,
+  }));
+
   return (
     <div className="space-y-6 animate-fadeIn">
 
@@ -174,26 +188,82 @@ function StudentsContent() {
         </button>
       </div>
 
-      {/* search */}
-      <div className="w-full max-w-md relative">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      {/* search and filters */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Search by name, ID, or phone..."
+            className="w-full h-10 pl-10 pr-12 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900/50 transition-all"
+          />
+          {inputValue && (
+            <button
+              onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-600 hover:text-zinc-400 text-xs"
+            >
+              Clear
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Search by name, ID, or phone..."
-          className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900/50 transition-all"
-        />
-        {inputValue && (
-          <button
-            onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-600 hover:text-zinc-400 text-xs"
+
+        {/* dojo filter */}
+        <div className="relative w-full md:w-48">
+          <select
+            value={selectedDojoId}
+            onChange={(e) => setParams({ dojoId: e.target.value || null, page: null })}
+            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
           >
-            Clear
+            <option value="" className="bg-zinc-950">All Dojos</option>
+            {dojos.map((dojo) => (
+              <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
+                {dojo.name}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+
+        {/* belt filter */}
+        <div className="relative w-full md:w-48">
+          <select
+            value={selectedBelt}
+            onChange={(e) => setParams({ belt: e.target.value || null, page: null })}
+            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+          >
+            <option value="" className="bg-zinc-950">All Belts</option>
+            {BELTS.map((b) => (
+              <option key={b.name} value={b.name} className="bg-zinc-950">
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+
+        {(inputValue || selectedDojoId || selectedBelt) && (
+          <button
+            onClick={() => {
+              setInputValue('');
+              setParams({ search: null, dojoId: null, belt: null, page: null });
+            }}
+            className="h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+          >
+            <span>Reset</span>
           </button>
         )}
       </div>
@@ -342,43 +412,23 @@ function StudentsContent() {
                 />
               </div>
 
-              {/* dojo dropdown */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Dojo Branch</label>
-                <select
-                  value={formData.dojoId}
-                  onChange={(e) => setFormData({ ...formData, dojoId: e.target.value })}
-                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-                >
-                  <option value="" className="bg-zinc-900">Select a dojo...</option>
-                  {dojos.map((dojo) => (
-                    <option key={dojo._id} value={dojo._id} className="bg-zinc-900">
-                      {dojo.name} — {dojo.location}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* dojo selection */}
+              <SearchableSelect
+                label="Dojo Branch"
+                value={formData.dojoId}
+                onChange={(val) => setFormData({ ...formData, dojoId: val })}
+                options={dojoOptions}
+                placeholder="Select a dojo..."
+              />
 
-              {/* belt dropdown */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Starting Belt</label>
-                <div className="relative">
-                  <select
-                    value={formData.belt}
-                    onChange={(e) => setFormData({ ...formData, belt: e.target.value })}
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-                  >
-                    {BELTS.map((b) => (
-                      <option key={b.name} value={b.name} className="bg-zinc-900">
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <BeltDot belt={formData.belt} />
-                  </div>
-                </div>
-              </div>
+              {/* belt selection */}
+              <SearchableSelect
+                label="Starting Belt"
+                value={formData.belt}
+                onChange={(val) => setFormData({ ...formData, belt: val })}
+                options={beltOptions}
+                placeholder="Select a belt..."
+              />
 
               {/* phone */}
               <div className="space-y-1.5">

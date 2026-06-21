@@ -15,6 +15,7 @@ export async function GET(request) {
     const limit = Number(searchParams.get("limit")) || 10;
     const search = searchParams.get("search")?.trim() || "";
     const dojoId = searchParams.get("dojoId")?.trim() || "";
+    const belt = searchParams.get("belt")?.trim() || "";
     const status = searchParams.get("status")?.trim() || "";
 
     const filter: Record<string, unknown> = {};
@@ -28,6 +29,7 @@ export async function GET(request) {
     }
 
     if (dojoId) filter.dojoId = dojoId;
+    if (belt) filter.belt = belt;
     if (status) filter.status = status;
 
     const skip = (page - 1) * limit;
