@@ -13,47 +13,20 @@ export async function GET(request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
+    const regex = new RegExp(query, "i");
+
     const dojos = await Dojo.aggregate([
       {
-        $search: {
-          index: "dojo",
-          compound: {
-            should: [
-              {
-                autocomplete: {
-                  query,
-                  path: "name",
-                  fuzzy: { maxEdits: 1, prefixLength: 0 },
-                },
-              },
-              {
-                autocomplete: {
-                  query,
-                  path: "dojoId",
-                  fuzzy: { maxEdits: 1, prefixLength: 0 },
-                },
-              },
-              {
-                autocomplete: {
-                  query,
-                  path: "location",
-                  fuzzy: { maxEdits: 1, prefixLength: 0 },
-                },
-              },
-              {
-                autocomplete: {
-                  query,
-                  path: "instructor",
-                  fuzzy: { maxEdits: 1, prefixLength: 0 },
-                },
-              },
-            ],
-          },
+        $match: {
+          $or: [
+            { name: { $regex: regex } },
+            { dojoId: { $regex: regex } },
+            { location: { $regex: regex } },
+            { instructor: { $regex: regex } },
+          ],
         },
       },
-      {
-        $limit: 20,
-      },
+      { $limit: 20 },
     ]);
 
     const mappedDojos = dojos.map((dojo) => {
