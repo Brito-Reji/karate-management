@@ -44,20 +44,20 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-zinc-950 px-4 select-none overflow-hidden">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-zinc-800/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="relative min-h-screen min-h-[100dvh] w-full flex items-center justify-center bg-zinc-950 px-4 py-8 sm:py-12 select-none overflow-x-hidden">
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(500px,90vw)] h-[min(500px,90vw)] bg-zinc-800/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-[440px] z-10">
-        <div className="text-center mb-10">
+        <div className="text-center mb-8 sm:mb-10">
           <span className="text-[10px] font-medium tracking-[0.3em] uppercase text-zinc-500 block mb-3">
             Administrative Portal
           </span>
-          <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-zinc-100">
+          <h1 className="text-xl sm:text-3xl font-light tracking-tight text-zinc-100 px-2">
             Martins Karate Academy
           </h1>
         </div>
 
-        <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-8 sm:p-10 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
+        <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 sm:p-10 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
           
           {error && (
             <div className="mb-6 p-3 rounded-lg bg-red-950/20 border border-red-500/20 text-xs text-red-400 text-center tracking-wide">
@@ -84,14 +84,11 @@ export default function AdminLogin() {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex justify-between items-center">
-                <label htmlFor="password" className="text-xs font-medium text-zinc-400 tracking-wide">
-                  Password
-                </label>
-                <a href="#forgot" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
-                  Forgot password?
-                </a>
-              </div>
+                <div className="flex justify-between items-center">
+                  <label htmlFor="password" className="text-xs font-medium text-zinc-400 tracking-wide">
+                    Password
+                  </label>
+                </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}

@@ -1,9 +1,13 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
+import { requireStaff } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // GET belt history for a student
 export async function GET(request, { params }) {
+  const { error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
     const { id } = await params;

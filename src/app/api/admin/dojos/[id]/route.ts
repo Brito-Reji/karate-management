@@ -1,12 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import Dojo from "@/models/Dojo";
 import connectDB from "@/lib/db";
+import { requireStaff } from "@/lib/requireAuth";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
+  const { error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
 

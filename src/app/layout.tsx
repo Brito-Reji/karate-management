@@ -14,10 +14,21 @@ export const metadata = {
   description: "Manage students, belts, and dojos with precision",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} h-full`}>
-      <body suppressHydrationWarning className="min-h-full" style={{ fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif" }}>
+      <body
+        suppressHydrationWarning
+        className="min-h-full overflow-x-hidden"
+        style={{ fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif" }}
+      >
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
