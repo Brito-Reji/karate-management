@@ -165,7 +165,7 @@ function DojosContent() {
 
         <button
           onClick={openCreateModal}
-          className="h-10 px-4 bg-zinc-100 hover:bg-white active:scale-[0.98] text-zinc-950 text-xs font-medium rounded-lg transition-all flex items-center justify-center space-x-2 self-start sm:self-auto shrink-0"
+          className="h-10 w-full sm:w-auto px-4 bg-zinc-100 hover:bg-white active:scale-[0.98] text-zinc-950 text-xs font-medium rounded-lg transition-all flex items-center justify-center space-x-2 shrink-0"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
@@ -175,7 +175,7 @@ function DojosContent() {
       </div>
 
       {/* SECTION: POWER FILTER SEARCH CONTROLLER INPUT BAR */}
-      <div className="w-full max-w-md relative">
+      <div className="w-full max-w-xl relative">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -185,8 +185,8 @@ function DojosContent() {
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Filter by branch title, instructor name, or region..."
-          className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900/50 transition-all"
+          placeholder="Filter by name, instructor, or location..."
+          className="w-full h-10 pl-10 pr-14 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900/50 transition-all"
         />
         {inputValue && (
           <button
@@ -215,35 +215,35 @@ function DojosContent() {
                 {dojos.map((dojo) => (
                   <div
                     key={dojo._id}
-                    className={`p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group ${
+                    className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
                       dojo._id === '__optimistic__' ? 'opacity-50' : ''
                     }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2.5">
-                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{dojo.name}</h3>
-                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>
+                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
                           {dojo.dojoId ?? '—'}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 text-xs text-zinc-500">
-                        <span className="text-zinc-400 font-medium">
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                        <span className="text-zinc-400 font-medium break-words">
                           {dojo.instructors && dojo.instructors.length > 0
                             ? dojo.instructors.join(", ")
                             : (dojo.instructor || '—')}
                         </span>
-                        <span>•</span>
-                        <span className="truncate max-w-[200px] sm:max-w-none">{dojo.location}</span>
+                        <span className="text-zinc-700">•</span>
+                        <span className="break-words">{dojo.location}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end space-x-6 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0">
-                      <div className="text-left sm:text-right hidden xs:block">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
+                      <div className="text-left sm:text-right">
                         <span className="text-xs font-mono text-zinc-300 font-medium">{dojo.count ?? 0}</span>
-                        <span className="text-[10px] text-zinc-600 block sm:inline sm:ml-1">Students</span>
+                        <span className="text-[10px] text-zinc-600 ml-1">Students</span>
                       </div>
 
-                      <div className="flex items-center space-x-4 ml-auto sm:ml-0">
+                      <div className="flex items-center gap-2 sm:gap-4">
                         <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
                           dojo.status === 'Active'
                             ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
@@ -255,7 +255,7 @@ function DojosContent() {
                         <button
                           onClick={() => openEditModal(dojo)}
                           disabled={dojo._id === '__optimistic__'}
-                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-7 px-3 rounded-md disabled:opacity-40"
+                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
                         >
                           Edit
                         </button>
@@ -309,10 +309,10 @@ function DojosContent() {
 
       {/* SECTION: UNIFIED DATA MUTATION MODAL OVERLAY */}
       {isModalOpen && (
-        <div className="fixed inset-0 w-full h-full flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
 
-          <div className="w-full max-w-md bg-zinc-950 border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative">
+          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
                 {editingDojo ? `Modify Branch Info: ${editingDojo.dojoId}` : 'Create New Dojo Branch'}

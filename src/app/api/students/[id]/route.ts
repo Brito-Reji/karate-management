@@ -1,11 +1,16 @@
 import connectDB from "@/lib/db";
-import Student from "@/models/Student";
+import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
+import { requireStaff, isDuplicateKeyError } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // GET single student
 export async function GET(request, { params }) {
+  const { error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
+    await ensureSharedPhoneAllowed();
     const { id } = await params;
     const student = await Student.findById(id);
     if (!student) {
@@ -25,8 +30,12 @@ export async function GET(request, { params }) {
 
 // UPDATE student
 export async function PUT(request, { params }) {
+  const { user, error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
+    await ensureSharedPhoneAllowed();
     const { id } = await params;
     const {
       name,
@@ -58,9 +67,10 @@ export async function PUT(request, { params }) {
         pendingFees,
         image,
         status,
+        updatedBy: user.userId,
         updatedAt: new Date(),
       },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     if (!student) {
@@ -70,9 +80,15 @@ export async function PUT(request, { params }) {
       );
     }
     return NextResponse.json({ success: true, message: "Student updated successfully", student });
-  } catch (error) {
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return NextResponse.json(
+        { success: false, message: "Could not update student due to a conflict. Please try again." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
-      { success: false, message: "Failed to update student", error: error.message },
+      { success: false, message: "Failed to update student", error: err.message },
       { status: 500 }
     );
   }
@@ -80,12 +96,15 @@ export async function PUT(request, { params }) {
 
 // SOFT DELETE
 export async function DELETE(request, { params }) {
+  const { user, error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
     const { id } = await params;
     const student = await Student.findByIdAndUpdate(
       id,
-      { status: "Inactive" },
+      { status: "Inactive", updatedBy: user.userId, updatedAt: new Date() },
       { new: true }
     );
     if (!student) {

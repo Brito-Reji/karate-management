@@ -16,6 +16,8 @@ export type StudentDocument = {
   pendingFees?: number;
   image?: string;
   status?: "Active" | "Inactive";
+  createdBy?: string;
+  updatedBy?: string;
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -26,7 +28,9 @@ const studentSchema = new Schema({
   dojoId: { type: String },
   dob: { type: Date },
   gender: { type: String, enum: ["Male", "Female", "Other"] },
-  phoneNumber: { type: String, required: true },
+  phoneNumber: { type: String, required: true, index: true },
+  createdBy: { type: String },
+  updatedBy: { type: String },
   fatherName: { type: String },
   motherName: { type: String },
   admissionDate: { type: Date, default: Date.now },
@@ -41,5 +45,23 @@ const studentSchema = new Schema({
 const Student =
   (mongoose.models.Student as Model<StudentDocument> | undefined) ||
   mongoose.model<StudentDocument>("Student", studentSchema);
+
+/** Drop legacy unique phone index so siblings can share a parent number. Safe to call repeatedly. */
+let phoneIndexFixed = false;
+export async function ensureSharedPhoneAllowed() {
+  if (phoneIndexFixed) return;
+  try {
+    const indexes = await Student.collection.indexes();
+    const phoneUnique = indexes.find(
+      (idx) => idx.key?.phoneNumber === 1 && idx.unique === true
+    );
+    if (phoneUnique?.name) {
+      await Student.collection.dropIndex(phoneUnique.name);
+    }
+    phoneIndexFixed = true;
+  } catch {
+    // Retry on next request if DB was not ready
+  }
+}
 
 export default Student;
