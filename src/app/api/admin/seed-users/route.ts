@@ -1,13 +1,40 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import { NextResponse } from "next/server";
+import { hashPassword } from "@/lib/password";
+import { type NextRequest, NextResponse } from "next/server";
 
-// seed admin users — call this once via POST /api/admin/seed-users
-export async function POST() {
+// Seed staff users — requires header: x-seed-secret: <SEED_SECRET>
+// Set SEED_SECRET in env. Without it, seeding is disabled.
+export async function POST(request: NextRequest) {
+  const seedSecret = process.env.SEED_SECRET;
+  if (!seedSecret) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Seeding is disabled. Set SEED_SECRET in environment variables.",
+      },
+      { status: 403 }
+    );
+  }
+
+  const provided = request.headers.get("x-seed-secret");
+  if (provided !== seedSecret) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   try {
     await connectDB();
 
-    const users = [
+    const users: {
+      name: string;
+      email: string;
+      phone: string;
+      password: string;
+      role: "admin" | "instructor";
+    }[] = [
       {
         name: "Sensei Martin",
         email: "martinskarateacademy@gmail.com",
@@ -15,14 +42,13 @@ export async function POST() {
         password: "martinskarateoffical@123",
         role: "admin",
       },
-      // add more users here
-      // {
-      //   name: "Person 2",
-      //   email: "person2@example.com",
-      //   phone: "8888888888",
-      //   password: "password123",
-      //   role: "admin",
-      // },
+      {
+        name: "Instructor Priya",
+        email: "priya@martinskarate.com",
+        phone: "8888888888",
+        password: "instructor@123",
+        role: "instructor",
+      },
     ];
 
     const results: string[] = [];
@@ -37,7 +63,8 @@ export async function POST() {
         continue;
       }
 
-      await User.create(u);
+      const hashed = await hashPassword(u.password);
+      await User.create({ ...u, password: hashed });
       results.push(`${u.name} — created`);
     }
 

@@ -1,14 +1,19 @@
 import connectDB from "@/lib/db";
-import Student from "@/models/Student";
+import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
 import { getNextSequence } from "@/models/Counter";
 import { BELTS } from "@/lib/constants";
+import { requireStaff, isDuplicateKeyError } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // GET all students with pagination + search + dojo filter
 export async function GET(request) {
+  const { error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
+    await ensureSharedPhoneAllowed();
 
     const { searchParams } = new URL(request.url);
     const page = Number(searchParams.get("page")) || 1;
@@ -56,13 +61,16 @@ export async function GET(request) {
 
 // CREATE a new student
 export async function POST(request) {
+  const { user, error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
+    await ensureSharedPhoneAllowed();
 
     const { name, dojoId, dob, gender, phoneNumber, belt, pendingFees, image, status } =
       await request.json();
 
-    // atomic ID generation
     const nextId = await getNextSequence("studentId");
 
     const beltInfo = BELTS.find((b) => b.name === belt);
@@ -78,9 +86,10 @@ export async function POST(request) {
       pendingFees,
       image,
       status,
+      createdBy: user.userId,
+      updatedBy: user.userId,
     });
 
-    // initial belt progression entry
     await BeltProgression.create({
       studentId: student._id,
       beltName: belt,
@@ -90,10 +99,15 @@ export async function POST(request) {
     });
 
     return NextResponse.json({ success: true, student });
-  } catch (error) {
-    console.log(error);
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return NextResponse.json(
+        { success: false, message: "A student with this ID already exists. Please try again." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
-      { success: false, message: "Failed to create student", error: error.message },
+      { success: false, message: "Failed to create student", error: err.message },
       { status: 500 }
     );
   }

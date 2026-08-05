@@ -57,6 +57,7 @@ export function useCreateStudent() {
 
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.recent() });
     },
   });
 }
