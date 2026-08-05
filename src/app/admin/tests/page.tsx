@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
-import { useAllDojos, useBeltHistory, usePromoteStudent } from '@/hooks/useBeltHistory';
+import { useAllDojos, useBeltHistory, usePromoteStudent, useUpdateBeltHistory, useDeleteBeltHistory } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
 import { useQuery } from '@tanstack/react-query';
@@ -33,11 +33,21 @@ function BeltDot({ belt }: { belt: string }) {
 function TestsContent() {
   const [searchInput, setSearchInput] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [formData, setFormData] = useState({
-    beltName: '',
-    awardedDate: new Date().toISOString().split('T')[0],
-    examiner: '',
-    notes: '',
+  const [formData, setFormData] = useState<{
+    beltName: string;
+    awardedDate: string;
+    examiner: string;
+    notes: string;
+    status: 'Pass' | 'Fail';
+  }>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('examiner_name') || '' : '';
+    return {
+      beltName: '',
+      awardedDate: new Date().toISOString().split('T')[0],
+      examiner: saved,
+      notes: '',
+      status: 'Pass',
+    };
   });
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -59,6 +69,19 @@ function TestsContent() {
   );
 
   const promote = usePromoteStudent();
+  const updateEntry = useUpdateBeltHistory();
+  const deleteEntry = useDeleteBeltHistory();
+
+  // editing state for belt history
+  const [editingEntry, setEditingEntry] = useState<null | {
+    _id: string;
+    beltName: string;
+    awardedDate: string;
+    examiner: string;
+    notes: string;
+    status: 'Pass' | 'Fail';
+  }>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // get dojo name
   const dojoName = (dojoId: string) => {
@@ -78,15 +101,15 @@ function TestsContent() {
     setSearchInput('');
     setFormError('');
     setSuccessMsg('');
-    // default to next belt
-    const nextBelt = availableBelts.length > 0 ? availableBelts[0] : null;
     const currentRank = BELTS.find((b) => b.name === student.belt)?.rank ?? 0;
     const nextAvailable = BELTS.filter((b) => b.rank > currentRank);
+    const savedExaminer = typeof window !== 'undefined' ? localStorage.getItem('examiner_name') || '' : '';
     setFormData({
       beltName: nextAvailable[0]?.name || '',
       awardedDate: new Date().toISOString().split('T')[0],
-      examiner: '',
+      examiner: savedExaminer,
       notes: '',
+      status: 'Pass',
     });
   };
 
@@ -103,23 +126,72 @@ function TestsContent() {
         awardedDate: formData.awardedDate,
         examiner: formData.examiner,
         notes: formData.notes,
+        status: formData.status,
       },
       {
         onSuccess: (data) => {
-          setSuccessMsg(`${selectedStudent.name} promoted to ${formData.beltName}!`);
-          // update local selected student
-          setSelectedStudent({ ...selectedStudent, belt: formData.beltName });
-          // reset form for next promotion
-          const newRank = BELTS.find((b) => b.name === formData.beltName)?.rank ?? 0;
+          if (formData.status === 'Pass') {
+            setSuccessMsg(`${selectedStudent.name} passed & promoted to ${formData.beltName}!`);
+            setSelectedStudent({ ...selectedStudent, belt: formData.beltName });
+          } else {
+            setSuccessMsg(`Recorded test result: ${selectedStudent.name} failed ${formData.beltName} test.`);
+          }
+          // reset form
+          const updatedBelt = formData.status === 'Pass' ? formData.beltName : (selectedStudent.belt || 'White');
+          const newRank = BELTS.find((b) => b.name === updatedBelt)?.rank ?? 0;
           const nextAvailable = BELTS.filter((b) => b.rank > newRank);
+          const savedExaminer = typeof window !== 'undefined' ? localStorage.getItem('examiner_name') || '' : '';
           setFormData({
             beltName: nextAvailable[0]?.name || '',
             awardedDate: new Date().toISOString().split('T')[0],
-            examiner: '',
+            examiner: savedExaminer,
             notes: '',
+            status: 'Pass',
           });
         },
         onError: (err) => setFormError(err.message),
+      }
+    );
+  };
+
+  // open edit form for a history entry
+  const handleEditEntry = (entry) => {
+    setEditingEntry({
+      _id: entry._id,
+      beltName: entry.beltName,
+      awardedDate: new Date(entry.awardedDate).toISOString().split('T')[0],
+      examiner: entry.examiner || '',
+      notes: entry.notes || '',
+      status: entry.status || 'Pass',
+    });
+  };
+
+  // save edited entry
+  const handleSaveEdit = () => {
+    if (!editingEntry || !selectedStudent) return;
+    updateEntry.mutate(
+      {
+        studentId: selectedStudent._id,
+        entryId: editingEntry._id,
+        beltName: editingEntry.beltName,
+        awardedDate: editingEntry.awardedDate,
+        examiner: editingEntry.examiner,
+        notes: editingEntry.notes,
+        status: editingEntry.status,
+      },
+      {
+        onSuccess: () => setEditingEntry(null),
+      }
+    );
+  };
+
+  // delete a history entry
+  const handleDeleteEntry = (entryId: string) => {
+    if (!selectedStudent) return;
+    deleteEntry.mutate(
+      { studentId: selectedStudent._id, entryId },
+      {
+        onSuccess: () => setDeleteConfirmId(null),
       }
     );
   };
@@ -251,9 +323,42 @@ function TestsContent() {
                 )}
 
                 <form onSubmit={handlePromote} className="space-y-4">
-                  {/* new belt */}
+                  {/* test result status */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-400 tracking-wide">Promote To</label>
+                    <label className="text-xs font-medium text-zinc-400 tracking-wide">Test Result</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, status: 'Pass' })}
+                        className={`h-9 text-xs font-medium rounded-lg border transition-all flex items-center justify-center space-x-1.5 ${
+                          formData.status === 'Pass'
+                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 font-semibold'
+                            : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${formData.status === 'Pass' ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                        <span>Pass (Promote)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, status: 'Fail' })}
+                        className={`h-9 text-xs font-medium rounded-lg border transition-all flex items-center justify-center space-x-1.5 ${
+                          formData.status === 'Fail'
+                            ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 font-semibold'
+                            : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${formData.status === 'Fail' ? 'bg-rose-400' : 'bg-zinc-600'}`} />
+                        <span>Fail</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* target belt */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-400 tracking-wide">
+                      {formData.status === 'Pass' ? 'Promote To' : 'Tested Belt'}
+                    </label>
                     <div className="relative">
                       <select
                         required
@@ -290,7 +395,13 @@ function TestsContent() {
                       <input
                         type="text"
                         value={formData.examiner}
-                        onChange={(e) => setFormData({ ...formData, examiner: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, examiner: val });
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('examiner_name', val);
+                          }
+                        }}
                         placeholder="Sensei name"
                         className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
                       />
@@ -312,9 +423,17 @@ function TestsContent() {
                   <button
                     type="submit"
                     disabled={promote.isPending}
-                    className="w-full h-10 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
+                    className={`w-full h-10 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50 ${
+                      formData.status === 'Pass'
+                        ? 'bg-zinc-200 hover:bg-white text-zinc-950'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white'
+                    }`}
                   >
-                    {promote.isPending ? 'Recording…' : 'Record Promotion'}
+                    {promote.isPending
+                      ? 'Recording…'
+                      : formData.status === 'Pass'
+                      ? 'Record Pass & Promote'
+                      : 'Record Failed Test'}
                   </button>
                 </form>
               </div>
@@ -327,7 +446,7 @@ function TestsContent() {
 
           {/* right: belt history timeline */}
           <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-            <h3 className="text-sm font-medium text-zinc-200 mb-4">Belt Progression History</h3>
+            <h3 className="text-sm font-medium text-zinc-200 mb-4">Belt Test History</h3>
 
             {isHistoryLoading ? (
               <div className="space-y-3 animate-pulse">
@@ -342,21 +461,57 @@ function TestsContent() {
 
                 <div className="space-y-4">
                   {beltHistory.map((entry, index) => (
-                    <div key={entry._id} className="flex items-start space-x-3 relative">
+                    <div key={entry._id} className="flex items-start space-x-3 relative group">
                       {/* dot */}
                       <div className="relative z-10 mt-1">
                         <BeltDot belt={entry.beltName} />
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-zinc-200">{entry.beltName}</span>
-                          {index === 0 && (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 uppercase tracking-wider">
-                              Current
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-zinc-200">{entry.beltName}</span>
+                            {entry.status === 'Fail' ? (
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-rose-950/40 border border-rose-500/30 text-rose-400 uppercase tracking-wider">
+                                Failed
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 uppercase tracking-wider">
+                                  Passed
+                                </span>
+                                {index === 0 && (
+                                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 uppercase tracking-wider">
+                                    Current
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* edit / delete buttons */}
+                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEditEntry(entry)}
+                              className="p-1 text-zinc-600 hover:text-zinc-300 transition-colors"
+                              title="Edit"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(entry._id)}
+                              className="p-1 text-zinc-600 hover:text-rose-400 transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
+
                         <div className="flex items-center space-x-2 text-[11px] text-zinc-500 mt-0.5">
                           <span>
                             {new Date(entry.awardedDate).toLocaleDateString('en-IN', {
@@ -375,6 +530,26 @@ function TestsContent() {
                         {entry.notes && (
                           <p className="text-[11px] text-zinc-600 mt-1">{entry.notes}</p>
                         )}
+
+                        {/* delete confirmation */}
+                        {deleteConfirmId === entry._id && (
+                          <div className="mt-2 flex items-center space-x-2 bg-rose-950/20 border border-rose-500/20 rounded-lg px-3 py-2">
+                            <span className="text-[11px] text-rose-400 flex-1">Delete this entry?</span>
+                            <button
+                              onClick={() => handleDeleteEntry(entry._id)}
+                              disabled={deleteEntry.isPending}
+                              className="text-[11px] font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                            >
+                              {deleteEntry.isPending ? 'Deleting…' : 'Yes'}
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(null)}
+                              className="text-[11px] font-medium text-zinc-500 hover:text-zinc-300"
+                            >
+                              No
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -385,6 +560,132 @@ function TestsContent() {
                 <p className="text-xs text-zinc-600 font-mono">No belt history recorded yet.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* edit history entry modal */}
+      {editingEntry && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingEntry(null)} />
+          <div className="relative w-full max-w-md bg-zinc-950 border border-white/[0.08] rounded-2xl p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)]">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center space-x-2">
+                <BeltDot belt={editingEntry.beltName} />
+                <h2 className="text-sm font-medium text-zinc-100">Edit — {editingEntry.beltName}</h2>
+              </div>
+              <button onClick={() => setEditingEntry(null)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* status toggle */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Result</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry({ ...editingEntry, status: 'Pass' })}
+                    className={`h-9 text-xs font-medium rounded-lg border transition-all flex items-center justify-center space-x-1.5 ${
+                      editingEntry.status === 'Pass'
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 font-semibold'
+                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${editingEntry.status === 'Pass' ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                    <span>Pass</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry({ ...editingEntry, status: 'Fail' })}
+                    className={`h-9 text-xs font-medium rounded-lg border transition-all flex items-center justify-center space-x-1.5 ${
+                      editingEntry.status === 'Fail'
+                        ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 font-semibold'
+                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${editingEntry.status === 'Fail' ? 'bg-rose-400' : 'bg-zinc-600'}`} />
+                    <span>Fail</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* belt */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Belt</label>
+                <div className="relative">
+                  <select
+                    value={editingEntry.beltName}
+                    onChange={(e) => setEditingEntry({ ...editingEntry, beltName: e.target.value })}
+                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+                  >
+                    {BELTS.map((b) => (
+                      <option key={b.name} value={b.name} className="bg-zinc-900">
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <BeltDot belt={editingEntry.beltName} />
+                  </div>
+                </div>
+              </div>
+
+              {/* date */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Test Date</label>
+                <input
+                  type="date"
+                  value={editingEntry.awardedDate}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, awardedDate: e.target.value })}
+                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
+                />
+              </div>
+
+              {/* examiner */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Examiner</label>
+                <input
+                  type="text"
+                  value={editingEntry.examiner}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, examiner: e.target.value })}
+                  placeholder="Sensei name"
+                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
+                />
+              </div>
+
+              {/* notes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Notes</label>
+                <textarea
+                  value={editingEntry.notes}
+                  onChange={(e) => setEditingEntry({ ...editingEntry, notes: e.target.value })}
+                  placeholder="Optional notes..."
+                  rows={2}
+                  className="w-full px-4 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all resize-none"
+                />
+              </div>
+
+              {/* actions */}
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  onClick={() => setEditingEntry(null)}
+                  className="h-9 px-4 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={updateEntry.isPending}
+                  className="h-9 px-5 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {updateEntry.isPending ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

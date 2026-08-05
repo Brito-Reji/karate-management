@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
   );
 
   const token = await new SignJWT({
-    role: "admin",
+    userId: user._id.toString(),
+    name: user.name,
+    role: user.role,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("7d")
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({
     success: true,
+    user: { name: user.name, role: user.role },
   });
 
   response.cookies.set("token", token, {

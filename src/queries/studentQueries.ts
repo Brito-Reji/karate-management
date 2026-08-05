@@ -44,6 +44,7 @@ export type BeltHistoryEntry = {
   awardedDate: string;
   examiner?: string;
   notes?: string;
+  status?: 'Pass' | 'Fail';
   createdAt?: string;
 };
 
@@ -156,23 +157,75 @@ export async function promoteStudent({
   awardedDate,
   examiner,
   notes,
+  status = 'Pass',
 }: {
   id: string;
   beltName: string;
   awardedDate?: string;
   examiner?: string;
   notes?: string;
+  status?: 'Pass' | 'Fail';
 }): Promise<{ student: Student; progression: BeltHistoryEntry }> {
   const res = await fetch(`/api/students/${id}/promote`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ beltName, awardedDate, examiner, notes }),
+    body:    JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
   });
   if (!res.ok) {
     const json = await res.json();
-    throw new Error(json.message || 'Failed to promote student');
+    throw new Error(json.message || 'Failed to record test result');
   }
   const json = await res.json();
   if (!json.success) throw new Error(json.message);
   return json;
 }
+
+// update a belt history entry
+export async function updateBeltHistoryEntry({
+  studentId,
+  entryId,
+  beltName,
+  awardedDate,
+  examiner,
+  notes,
+  status,
+}: {
+  studentId: string;
+  entryId: string;
+  beltName?: string;
+  awardedDate?: string;
+  examiner?: string;
+  notes?: string;
+  status?: 'Pass' | 'Fail';
+}): Promise<{ entry: BeltHistoryEntry }> {
+  const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.message || 'Failed to update entry');
+  }
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json;
+}
+
+// delete a belt history entry
+export async function deleteBeltHistoryEntry({
+  studentId,
+  entryId,
+}: {
+  studentId: string;
+  entryId: string;
+}): Promise<void> {
+  const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.message || 'Failed to delete entry');
+  }
+}
+

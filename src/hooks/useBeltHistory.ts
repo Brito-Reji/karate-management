@@ -7,6 +7,8 @@ import {
   beltHistoryQuery,
   allDojosQuery,
   promoteStudent,
+  updateBeltHistoryEntry,
+  deleteBeltHistoryEntry,
 } from '@/queries/studentQueries';
 
 export function useBeltHistory(studentId: string) {
@@ -30,3 +32,29 @@ export function usePromoteStudent() {
     },
   });
 }
+
+export function useUpdateBeltHistory() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateBeltHistoryEntry,
+
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
+    },
+  });
+}
+
+export function useDeleteBeltHistory() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteBeltHistoryEntry,
+
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
+    },
+  });
+}
+
