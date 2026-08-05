@@ -15,6 +15,8 @@ export type Student = {
   pendingFees?: number;
   image?: string;
   status?: "Active" | "Inactive";
+  createdBy?: string;
+  updatedBy?: string;
 };
 
 export type StudentInput = Omit<Student, "_id">;
@@ -44,7 +46,20 @@ export type BeltHistoryEntry = {
   awardedDate: string;
   examiner?: string;
   notes?: string;
+  status?: 'Pass' | 'Fail';
   createdAt?: string;
+};
+
+export type RecentTestEntry = {
+  _id: string;
+  beltName: string;
+  rank: number;
+  awardedDate: string;
+  examiner?: string;
+  notes?: string;
+  status?: 'Pass' | 'Fail';
+  createdAt?: string;
+  student: Student | null;
 };
 
 // --- fetchers ---
@@ -82,6 +97,14 @@ export async function fetchBeltHistory(id: string): Promise<BeltHistoryEntry[]> 
   return json.history;
 }
 
+export async function fetchRecentTests(limit = 30): Promise<RecentTestEntry[]> {
+  const res = await fetch(`/api/admin/tests?limit=${limit}`);
+  if (!res.ok) throw new Error('Failed to load recent tests');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'Failed to load recent tests');
+  return json.history;
+}
+
 // unpaginated dojo list for dropdowns
 export async function fetchAllDojos(): Promise<{ _id: string; dojoId: string; name: string; location: string }[]> {
   const res = await fetch('/api/admin/dojos?limit=100');
@@ -110,6 +133,11 @@ export const beltHistoryQuery = (id: string) => ({
   enabled:  !!id,
 });
 
+export const recentTestsQuery = (limit = 30) => ({
+  queryKey: queryKeys.tests.recent(),
+  queryFn:  () => fetchRecentTests(limit),
+});
+
 export const allDojosQuery = () => ({
   queryKey: queryKeys.dojos.dropdown(),
   queryFn:  () => fetchAllDojos(),
@@ -124,9 +152,8 @@ export async function createStudent(data: StudentInput): Promise<Student> {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to create student');
   const json = await res.json();
-  if (!json.success) throw new Error(json.message);
+  if (!res.ok || !json.success) throw new Error(json.message || 'Failed to create student');
   return json.student;
 }
 
@@ -136,17 +163,15 @@ export async function updateStudent({ id, ...data }: StudentInput & { id: string
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to update student');
   const json = await res.json();
-  if (!json.success) throw new Error(json.message);
+  if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update student');
   return json.student;
 }
 
 export async function deleteStudent(id: string): Promise<Student> {
   const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to deactivate student');
   const json = await res.json();
-  if (!json.success) throw new Error(json.message);
+  if (!res.ok || !json.success) throw new Error(json.message || 'Failed to deactivate student');
   return json.student;
 }
 
@@ -156,23 +181,75 @@ export async function promoteStudent({
   awardedDate,
   examiner,
   notes,
+  status = 'Pass',
 }: {
   id: string;
   beltName: string;
   awardedDate?: string;
   examiner?: string;
   notes?: string;
+  status?: 'Pass' | 'Fail';
 }): Promise<{ student: Student; progression: BeltHistoryEntry }> {
   const res = await fetch(`/api/students/${id}/promote`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ beltName, awardedDate, examiner, notes }),
+    body:    JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
   });
   if (!res.ok) {
     const json = await res.json();
-    throw new Error(json.message || 'Failed to promote student');
+    throw new Error(json.message || 'Failed to record test result');
   }
   const json = await res.json();
   if (!json.success) throw new Error(json.message);
   return json;
 }
+
+// update a belt history entry
+export async function updateBeltHistoryEntry({
+  studentId,
+  entryId,
+  beltName,
+  awardedDate,
+  examiner,
+  notes,
+  status,
+}: {
+  studentId: string;
+  entryId: string;
+  beltName?: string;
+  awardedDate?: string;
+  examiner?: string;
+  notes?: string;
+  status?: 'Pass' | 'Fail';
+}): Promise<{ entry: BeltHistoryEntry }> {
+  const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.message || 'Failed to update entry');
+  }
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json;
+}
+
+// delete a belt history entry
+export async function deleteBeltHistoryEntry({
+  studentId,
+  entryId,
+}: {
+  studentId: string;
+  entryId: string;
+}): Promise<void> {
+  const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.message || 'Failed to delete entry');
+  }
+}
+
