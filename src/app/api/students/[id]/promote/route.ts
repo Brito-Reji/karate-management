@@ -9,7 +9,7 @@ export async function POST(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const { beltName, awardedDate, examiner, notes } = await request.json();
+    const { beltName, awardedDate, examiner, notes, status = "Pass" } = await request.json();
 
     const student = await Student.findById(id);
     if (!student) {
@@ -35,14 +35,17 @@ export async function POST(request, { params }) {
       );
     }
 
-    // update belt
-    const updatedStudent = await Student.findByIdAndUpdate(
-      id,
-      { belt: beltName, updatedAt: new Date() },
-      { new: true }
-    );
+    // update belt if passed
+    let updatedStudent = student;
+    if (status === "Pass") {
+      updatedStudent = await Student.findByIdAndUpdate(
+        id,
+        { belt: beltName, updatedAt: new Date() },
+        { new: true }
+      );
+    }
 
-    // log the progression
+    // log test result
     const progression = await BeltProgression.create({
       studentId: student._id,
       beltName,
@@ -50,6 +53,7 @@ export async function POST(request, { params }) {
       awardedDate: awardedDate || new Date(),
       examiner,
       notes,
+      status,
     });
 
     return NextResponse.json({ success: true, student: updatedStudent, progression });

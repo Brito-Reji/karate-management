@@ -1,14 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  // fetch current user on mount
+  useEffect(() => {
+    if (pathname === '/admin/login') return;
+    fetch('/api/admin/me')
+      .then((r) => r.json())
+      .then((data) => { if (data.success) setCurrentUser(data.user); })
+      .catch(() => {});
+  }, [pathname]);
 
   const handleLogout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' });
@@ -73,8 +83,8 @@ export default function AdminLayout({ children }) {
         <div className="p-4 border-t border-white/[0.06] bg-zinc-900/10">
           <div className="flex items-center justify-between px-2">
             <div className="flex flex-col">
-              <span className="text-xs font-medium text-zinc-300">Sensei Martin</span>
-              <span className="text-[10px] text-zinc-500">Administrator</span>
+              <span className="text-xs font-medium text-zinc-300">{currentUser?.name || '—'}</span>
+              <span className="text-[10px] text-zinc-500 capitalize">{currentUser?.role || '—'}</span>
             </div>
             <button
               onClick={() => setShowLogoutConfirm(true)}
