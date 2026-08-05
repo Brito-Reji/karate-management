@@ -30,10 +30,10 @@ curl -X POST http://localhost:3000/api/admin/seed-users \
 
 | Role | Email / Phone | Password |
 |------|---------------|----------|
-| Admin | `martinskarateacademy@gmail.com` / `9999999999` | `martinskarateoffical@123` |
-| Instructor | `priya@martinskarate.com` / `8888888888` | `instructor@123` |
+| Admin | `martinskarateacademy@gmail.com` | `martinskarateoffical@123` |
+| Staff 1–4 | `staff1@martinskarate.com` … `staff4@martinskarate.com` | `staff@123456` |
 
-Admins can add more staff under **Staff** in the sidebar.
+Phones for staff: `9000000001`–`9000000004`. Admins can also add more staff under **Staff** in the sidebar.
 
 ## Deploy on Vercel
 
