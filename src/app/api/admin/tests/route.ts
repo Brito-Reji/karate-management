@@ -13,10 +13,14 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(Number(searchParams.get("limit")) || 30, 100);
+    const limit = Math.min(Number(searchParams.get("limit")) || 10, 100);
+    const page = Math.max(Number(searchParams.get("page")) || 1, 1);
+    const skip = (page - 1) * limit;
 
+    const total = await BeltProgression.countDocuments({});
     const history = await BeltProgression.find({})
       .sort({ awardedDate: -1, createdAt: -1 })
+      .skip(skip)
       .limit(limit)
       .populate({
         path: "studentId",
@@ -82,7 +86,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ success: true, history: entries });
+    return NextResponse.json({
+      success: true,
+      history: entries,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     return NextResponse.json(
       { success: false, message: "Failed to load recent tests", error: err.message },

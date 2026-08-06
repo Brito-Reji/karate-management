@@ -16,6 +16,7 @@ export const queryKeys = {
   },
 
   tests: {
-    recent: () => ['tests', 'recent'],
+    all:    ()                         => ['tests'],
+    recent: (page = 1, limit = 10)    => ['tests', 'recent', { page, limit }],
   },
 };
