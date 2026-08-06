@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Karate Management
 
-## Getting Started
+Admin portal for Martins Karate Academy — dojos, students, belt tests, and staff accounts.
 
-First, run the development server:
+## Getting Started (local)
+
+1. Copy env vars into `.env` or `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+MONGO_URI=mongodb+srv://...your-dev-database...
+JWT_SECRET=a-long-random-dev-secret
+SEED_SECRET=a-local-seed-secret
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install and run:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Seed staff users once (requires `SEED_SECRET`):
 
-## Learn More
+```bash
+curl -X POST http://localhost:3000/api/admin/seed-users \
+  -H "x-seed-secret: a-local-seed-secret"
+```
 
-To learn more about Next.js, take a look at the following resources:
+4. Log in at [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Role | Email / Phone | Password |
+|------|---------------|----------|
+| Admin | `martinskarateacademy@gmail.com` | `martinskarateoffical@123` |
+| Staff 1–4 | `staff1@martinskarate.com` … `staff4@martinskarate.com` | `staff@123456` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Phones for staff: `9000000001`–`9000000004`. Admins can also add more staff under **Staff** in the sidebar.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Dev and production use **separate** MongoDB databases and env vars. Local `.env` is never used by Vercel.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 1. Environment variables (Vercel → Project → Settings → Environment Variables)
+
+Set these for **Production** (and Preview if you want):
+
+| Name | Value |
+|------|--------|
+| `MONGO_URI` | Production MongoDB connection string (not your local/dev DB) |
+| `JWT_SECRET` | Long random secret, different from local |
+| `SEED_SECRET` | Secret used only for one-time user seeding |
+
+After saving, **Redeploy** so the new vars apply.
+
+### 2. Deploy
+
+Push to the branch Vercel watches, or trigger a redeploy from the dashboard. Wait until the deployment is Ready.
+
+### 3. Seed production users (once)
+
+```bash
+curl -X POST https://YOUR-APP.vercel.app/api/admin/seed-users \
+  -H "x-seed-secret: YOUR_PRODUCTION_SEED_SECRET"
+```
+
+Without the correct `x-seed-secret` header, seeding returns 401. If `SEED_SECRET` is unset on Vercel, seeding is disabled (403).
+
+### 4. Log in on production
+
+Open `https://YOUR-APP.vercel.app/admin/login` with the seeded admin credentials, then use **Staff** to add real instructors with strong passwords.
+
+### 5. After go-live
+
+- Prefer adding staff via the Staff page (passwords are bcrypt-hashed).
+- You can remove `SEED_SECRET` from Vercel later to fully disable the seed endpoint.
+- Do not reuse the default seed passwords on a real public site — change them after first login or create new admin accounts and retire the seed users.
+
+## Security notes
+
+- Passwords are hashed with bcrypt. Legacy plain-text passwords still work once, then are upgraded on login.
+- `/api/admin/seed-users` requires `x-seed-secret`.
+- Student and admin dojo APIs require a logged-in admin or instructor.
+- Staff management (`/api/admin/users` and `/admin/staff`) is admin-only.

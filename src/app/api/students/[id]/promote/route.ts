@@ -2,14 +2,18 @@ import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
 import { BELTS } from "@/lib/constants";
+import { requireStaff } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // POST — promote a student's belt
 export async function POST(request, { params }) {
+  const { user, error } = await requireStaff();
+  if (error) return error;
+
   try {
     await connectDB();
     const { id } = await params;
-    const { beltName, awardedDate, examiner, notes } = await request.json();
+    const { beltName, awardedDate, examiner, notes, status = "Pass" } = await request.json();
 
     const student = await Student.findById(id);
     if (!student) {
@@ -35,21 +39,23 @@ export async function POST(request, { params }) {
       );
     }
 
-    // update belt
-    const updatedStudent = await Student.findByIdAndUpdate(
-      id,
-      { belt: beltName, updatedAt: new Date() },
-      { new: true }
-    );
+    let updatedStudent = student;
+    if (status === "Pass") {
+      updatedStudent = await Student.findByIdAndUpdate(
+        id,
+        { belt: beltName, updatedBy: user.userId, updatedAt: new Date() },
+        { new: true }
+      );
+    }
 
-    // log the progression
     const progression = await BeltProgression.create({
       studentId: student._id,
       beltName,
       rank: newBelt.rank,
       awardedDate: awardedDate || new Date(),
-      examiner,
+      examiner: examiner || user.name,
       notes,
+      status,
     });
 
     return NextResponse.json({ success: true, student: updatedStudent, progression });

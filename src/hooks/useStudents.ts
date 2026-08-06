@@ -57,6 +57,7 @@ export function useCreateStudent() {
 
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
     },
   });
 }
@@ -96,6 +97,41 @@ export function useUpdateStudent() {
     },
 
     onSettled: (_data, _err, { id }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
+    },
+  });
+}
+
+export function useActivateStudent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => updateStudent({ id, status: 'Active' }),
+
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: queryKeys.students.all() });
+
+      const prevList = qc.getQueriesData({ queryKey: queryKeys.students.all() });
+
+      qc.setQueriesData<StudentListResponse>({ queryKey: queryKeys.students.all() }, (old) => {
+        if (!old?.students) return old;
+        return {
+          ...old,
+          students: old.students.map((s) =>
+            s._id === id ? { ...s, status: 'Active' } : s
+          ),
+        };
+      });
+
+      return { prevList };
+    },
+
+    onError: (_err, _id, ctx) => {
+      ctx?.prevList?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+
+    onSettled: (_data, _err, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
     },
