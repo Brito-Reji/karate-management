@@ -240,7 +240,9 @@ function DojosContent() {
                     <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
                       <div className="text-left sm:text-right">
                         <span className="text-xs font-mono text-zinc-300 font-medium">{dojo.count ?? 0}</span>
-                        <span className="text-[10px] text-zinc-600 ml-1">Students</span>
+                        <span className="text-[10px] text-zinc-600 ml-1">
+                          {(dojo.count ?? 0) === 1 ? 'Student' : 'Students'}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-2 sm:gap-4">

@@ -472,9 +472,9 @@ function TestsContent() {
             )}
           </div>
 
-          {/* right: belt history list */}
+          {/* right: test details for selected student */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-zinc-200 px-1">Belt Test History</h3>
+            <h3 className="text-sm font-medium text-zinc-200 px-1">Test Details</h3>
 
             {isHistoryLoading ? (
               <SkeletonRows />
@@ -705,11 +705,16 @@ function TestsContent() {
         </div>
       )}
 
-      {/* recent test history when no student is selected */}
+      {/* test history when no student is selected */}
       {!selectedStudent && debouncedSearch.length < 2 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-medium text-zinc-200">Recent Belt Tests</h3>
+            <h3 className="text-sm font-medium text-zinc-200">
+              Test History
+              {typeof recentTestsData?.total === 'number' ? (
+                <span className="text-zinc-500 font-normal"> ({recentTestsData.total})</span>
+              ) : null}
+            </h3>
             {isRecentFetching && !isRecentLoading && (
               <span className="text-[10px] text-zinc-500 font-mono animate-pulse">Syncing…</span>
             )}
@@ -726,74 +731,68 @@ function TestsContent() {
                   ref={recentListRef}
                   className="max-h-[min(28rem,55vh)] overflow-y-auto overscroll-contain scroll-smooth divide-y divide-white/[0.04]"
                 >
-                  {recentTests.map((entry) => (
-                    <button
-                      key={entry._id}
-                      type="button"
-                      disabled={!entry.student}
-                      onClick={() => entry.student && handleSelectStudent(entry.student)}
-                      className="w-full text-left p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group disabled:opacity-50 disabled:cursor-default"
-                    >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                          <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">
-                            {entry.student?.name || 'Unknown student'}
-                          </h3>
-                          {entry.student?.studentId && (
-                            <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                              {entry.student.studentId}
-                            </span>
-                          )}
-                          {entry.status === 'Fail' ? (
-                            <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-rose-950/20 border-rose-500/20 text-rose-400">
-                              Failed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-emerald-950/20 border-emerald-500/20 text-emerald-400">
-                              Passed
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                          <BeltDot belt={entry.beltName} />
-                          <span className="text-zinc-400 font-medium">{entry.beltName}</span>
-                          <span className="text-zinc-700">•</span>
-                          <span>
-                            {new Date(entry.awardedDate).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </span>
-                          {entry.examiner && (
-                            <>
-                              <span className="text-zinc-700">•</span>
-                              <span>by {entry.examiner}</span>
-                            </>
-                          )}
-                          {entry.student?.dojoId && (
-                            <>
-                              <span className="text-zinc-700">•</span>
-                              <span className="break-words">{dojoName(entry.student.dojoId)}</span>
-                            </>
-                          )}
-                        </div>
-                        {entry.notes && (
-                          <p className="text-xs text-zinc-600 mt-0.5 line-clamp-2">{entry.notes}</p>
-                        )}
-                      </div>
+                  {recentTests.map((entry) => {
+                    const isFail = entry.status === 'Fail';
+                    const testType = isFail ? 'Belt Test' : 'Promotion';
 
-                      {entry.student && (
-                        <span className="text-xs font-medium text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 self-end sm:self-auto">
-                          Record →
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                    return (
+                      <div
+                        key={entry._id}
+                        className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors"
+                      >
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                            <BeltDot belt={entry.beltName} />
+                            <h3 className="text-sm font-medium text-zinc-200 break-words">
+                              {entry.beltName}
+                            </h3>
+                            <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-zinc-900 border-zinc-800 text-zinc-400">
+                              {testType}
+                            </span>
+                            {isFail ? (
+                              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-rose-950/20 border-rose-500/20 text-rose-400">
+                                Fail
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-emerald-950/20 border-emerald-500/20 text-emerald-400">
+                                Pass
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                            <span>
+                              {new Date(entry.awardedDate).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            {entry.rank != null && (
+                              <>
+                                <span className="text-zinc-700">•</span>
+                                <span>Rank {entry.rank}</span>
+                              </>
+                            )}
+                            {entry.examiner && (
+                              <>
+                                <span className="text-zinc-700">•</span>
+                                <span>Examiner: {entry.examiner}</span>
+                              </>
+                            )}
+                          </div>
+
+                          {entry.notes && (
+                            <p className="text-xs text-zinc-600 mt-0.5 line-clamp-2">{entry.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-12 text-center space-y-2">
-                  <p className="text-xs text-zinc-600 font-mono">No belt tests recorded yet.</p>
+                  <p className="text-xs text-zinc-600 font-mono">No test history recorded yet.</p>
                   <p className="text-xs text-zinc-500">Search for a student above to record the first test.</p>
                 </div>
               )}
