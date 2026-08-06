@@ -58,6 +58,7 @@ export function useCreateStudent() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
     },
   });
 }
@@ -99,6 +100,7 @@ export function useUpdateStudent() {
     onSettled: (_data, _err, { id }) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
     },
   });
 }
@@ -134,6 +136,7 @@ export function useActivateStudent() {
     onSettled: (_data, _err, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
     },
   });
 }
@@ -170,6 +173,7 @@ export function useDeleteStudent() {
     onSettled: (_data, _err, id) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
     },
   });
 }
