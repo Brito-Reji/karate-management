@@ -78,6 +78,7 @@ function StudentsContent() {
   const { data: dojos = [] } = useAllDojos();
 
   const students = listData?.students ?? [];
+  const totalStudents = listData?.total;
   const totalPages = listData?.totalPages ?? 1;
 
   const createStudent = useCreateStudent();
@@ -176,7 +177,9 @@ function StudentsContent() {
       {/* header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
         <div>
-          <h1 className="text-xl font-light tracking-tight text-zinc-100">Students</h1>
+          <h1 className="text-xl font-light tracking-tight text-zinc-100">
+            Students{typeof totalStudents === 'number' ? ` (${totalStudents})` : ''}
+          </h1>
           <p className="text-xs text-zinc-500 mt-1">Manage enrolled student records and belt assignments.</p>
           <div className="mt-1.5">
             <StaleIndicator isFetching={isFetching && !isLoading} />
