@@ -51,6 +51,20 @@ export async function requireStaff() {
   return { user, error: null };
 }
 
+/** Admins see all students; instructors only see students they created. */
+export function getStudentScopeFilter(user: AuthUser): Record<string, unknown> {
+  if (user.role === "admin") return {};
+  return { createdBy: user.userId };
+}
+
+export function canAccessStudent(
+  user: AuthUser,
+  student: { createdBy?: string | null }
+): boolean {
+  if (user.role === "admin") return true;
+  return student.createdBy === user.userId;
+}
+
 export async function requireAdmin() {
   const user = await getAuthUser();
   if (!user) {
