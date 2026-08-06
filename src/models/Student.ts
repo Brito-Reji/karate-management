@@ -8,7 +8,7 @@ export type StudentDocument = {
   dojoId?: string;
   dob?: Date;
   gender?: "Male" | "Female" | "Other";
-  phoneNumber: string;
+  phoneNumber?: string;
   fatherName?: string;
   motherName?: string;
   admissionDate?: Date;
@@ -28,7 +28,7 @@ const studentSchema = new Schema({
   dojoId: { type: String },
   dob: { type: Date },
   gender: { type: String, enum: ["Male", "Female", "Other"] },
-  phoneNumber: { type: String, required: true, index: true },
+  phoneNumber: { type: String, index: true },
   createdBy: { type: String },
   updatedBy: { type: String },
   fatherName: { type: String },
@@ -45,6 +45,11 @@ const studentSchema = new Schema({
 const Student =
   (mongoose.models.Student as Model<StudentDocument> | undefined) ||
   mongoose.model<StudentDocument>("Student", studentSchema);
+
+// Hot reload can keep an older compiled schema; keep phone optional.
+if (mongoose.models.Student) {
+  Student.schema.path("phoneNumber").required(false);
+}
 
 /** Drop legacy unique phone index so siblings can share a parent number. Safe to call repeatedly. */
 let phoneIndexFixed = false;
