@@ -16,8 +16,8 @@ export function useBeltHistory(studentId: string) {
   return useQuery(beltHistoryQuery(studentId));
 }
 
-export function useRecentTests(limit = 30) {
-  return useQuery(recentTestsQuery(limit));
+export function useRecentTests(page = 1, limit = 10) {
+  return useQuery(recentTestsQuery(page, limit));
 }
 
 export function useAllDojos() {
@@ -34,7 +34,7 @@ export function usePromoteStudent() {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.id) });
-      qc.invalidateQueries({ queryKey: queryKeys.tests.recent() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
     },
   });
 }
@@ -47,7 +47,7 @@ export function useUpdateBeltHistory() {
 
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
-      qc.invalidateQueries({ queryKey: queryKeys.tests.recent() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
     },
   });
 }
@@ -61,7 +61,7 @@ export function useDeleteBeltHistory() {
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
-      qc.invalidateQueries({ queryKey: queryKeys.tests.recent() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
     },
   });
 }

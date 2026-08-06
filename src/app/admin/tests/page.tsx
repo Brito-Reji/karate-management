@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useRef, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAllDojos, useBeltHistory, useRecentTests, usePromoteStudent, useUpdateBeltHistory, useDeleteBeltHistory } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
@@ -31,6 +32,12 @@ function BeltDot({ belt }: { belt: string }) {
 }
 
 function TestsContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentPage = Number(searchParams.get('page')) || 1;
+  const RECENT_TESTS_LIMIT = 10;
+
   const [searchInput, setSearchInput] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [formData, setFormData] = useState<{
@@ -70,10 +77,23 @@ function TestsContent() {
 
   // recent tests across all students (shown when none selected)
   const {
-    data: recentTests = [],
+    data: recentTestsData,
     isLoading: isRecentLoading,
     isFetching: isRecentFetching,
-  } = useRecentTests(30);
+  } = useRecentTests(currentPage, RECENT_TESTS_LIMIT);
+
+  const recentTests = recentTestsData?.history ?? [];
+  const totalPages = recentTestsData?.totalPages ?? 1;
+
+  const recentListRef = useRef<HTMLDivElement>(null);
+
+  const setPage = useCallback((page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page <= 1) params.delete('page');
+    else params.set('page', String(page));
+    router.push(`${pathname}?${params.toString()}`);
+    recentListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [searchParams, router, pathname]);
 
   const promote = usePromoteStudent();
   const updateEntry = useUpdateBeltHistory();
@@ -459,9 +479,11 @@ function TestsContent() {
             {isHistoryLoading ? (
               <SkeletonRows />
             ) : (
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
+              <div className={`bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
+                isHistoryLoading ? 'opacity-60' : 'opacity-100'
+              }`}>
                 {beltHistory.length > 0 ? (
-                  <div className="divide-y divide-white/[0.04]">
+                  <div className="max-h-[min(28rem,55vh)] overflow-y-auto overscroll-contain scroll-smooth divide-y divide-white/[0.04]">
                     {beltHistory.map((entry, index) => (
                       <div
                         key={entry._id}
@@ -700,7 +722,10 @@ function TestsContent() {
               isRecentFetching ? 'opacity-60' : 'opacity-100'
             }`}>
               {recentTests.length > 0 ? (
-                <div className="divide-y divide-white/[0.04]">
+                <div
+                  ref={recentListRef}
+                  className="max-h-[min(28rem,55vh)] overflow-y-auto overscroll-contain scroll-smooth divide-y divide-white/[0.04]"
+                >
                   {recentTests.map((entry) => (
                     <button
                       key={entry._id}
@@ -772,6 +797,32 @@ function TestsContent() {
                   <p className="text-xs text-zinc-500">Search for a student above to record the first test.</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {totalPages > 1 && !selectedStudent && debouncedSearch.length < 2 && (
+            <div className="flex items-center justify-between px-1 pt-2">
+              <p className="text-[11px] text-zinc-600 font-mono">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1 || isRecentFetching}
+                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages || isRecentFetching}
+                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

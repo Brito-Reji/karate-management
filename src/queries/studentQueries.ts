@@ -97,12 +97,24 @@ export async function fetchBeltHistory(id: string): Promise<BeltHistoryEntry[]> 
   return json.history;
 }
 
-export async function fetchRecentTests(limit = 30): Promise<RecentTestEntry[]> {
-  const res = await fetch(`/api/admin/tests?limit=${limit}`);
+export type RecentTestsResponse = {
+  history: RecentTestEntry[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
+export async function fetchRecentTests(page = 1, limit = 10): Promise<RecentTestsResponse> {
+  const res = await fetch(`/api/admin/tests?page=${page}&limit=${limit}`);
   if (!res.ok) throw new Error('Failed to load recent tests');
   const json = await res.json();
   if (!json.success) throw new Error(json.message || 'Failed to load recent tests');
-  return json.history;
+  return {
+    history: json.history,
+    total: json.total,
+    page: json.page,
+    totalPages: json.totalPages,
+  };
 }
 
 // unpaginated dojo list for dropdowns
@@ -133,9 +145,9 @@ export const beltHistoryQuery = (id: string) => ({
   enabled:  !!id,
 });
 
-export const recentTestsQuery = (limit = 30) => ({
-  queryKey: queryKeys.tests.recent(),
-  queryFn:  () => fetchRecentTests(limit),
+export const recentTestsQuery = (page = 1, limit = 10) => ({
+  queryKey: queryKeys.tests.recent(page, limit),
+  queryFn:  () => fetchRecentTests(page, limit),
 });
 
 export const allDojosQuery = () => ({
