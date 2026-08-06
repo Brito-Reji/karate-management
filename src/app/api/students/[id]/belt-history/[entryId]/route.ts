@@ -1,12 +1,12 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
 import { BELTS } from "@/lib/constants";
-import { requireStaff } from "@/lib/requireAuth";
+import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // update a belt history entry
 export async function PUT(request, { params }) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -46,7 +46,7 @@ export async function PUT(request, { params }) {
 
 // delete a belt history entry
 export async function DELETE(request, { params }) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {

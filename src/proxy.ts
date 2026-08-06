@@ -49,7 +49,15 @@ export async function proxy(request) {
       process.env.JWT_SECRET
     );
 
-    await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret);
+
+    const role = payload.role as string | undefined;
+    if (pathname.startsWith("/admin/tests") && role !== "admin") {
+      return NextResponse.redirect(new URL("/admin/dojos", request.url));
+    }
+    if (pathname.startsWith("/admin/staff") && role !== "admin") {
+      return NextResponse.redirect(new URL("/admin/dojos", request.url));
+    }
 
     return NextResponse.next();
   } catch {
