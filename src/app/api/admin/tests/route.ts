@@ -1,12 +1,12 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
 import "@/models/Student";
-import { requireStaff } from "@/lib/requireAuth";
+import { requireAdmin } from "@/lib/requireAuth";
 import { type NextRequest, NextResponse } from "next/server";
 
 // GET recent belt tests across all students
 export async function GET(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {

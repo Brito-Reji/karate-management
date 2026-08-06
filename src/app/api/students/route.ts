@@ -3,12 +3,12 @@ import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
 import { getNextSequence } from "@/models/Counter";
 import { BELTS } from "@/lib/constants";
-import { requireStaff, isDuplicateKeyError } from "@/lib/requireAuth";
+import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // GET all students with pagination + search + dojo filter
 export async function GET(request) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
@@ -23,7 +23,7 @@ export async function GET(request) {
     const belt = searchParams.get("belt")?.trim() || "";
     const status = searchParams.get("status")?.trim() || "";
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { ...getStudentScopeFilter(user) };
 
     if (search) {
       filter.$or = [

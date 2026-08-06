@@ -2,12 +2,12 @@ import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
 import { BELTS } from "@/lib/constants";
-import { requireStaff } from "@/lib/requireAuth";
+import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
 // POST — promote a student's belt
 export async function POST(request, { params }) {
-  const { user, error } = await requireStaff();
+  const { user, error } = await requireAdmin();
   if (error) return error;
 
   try {
