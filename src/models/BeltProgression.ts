@@ -7,6 +7,7 @@ export type BeltProgressionDocument = {
   awardedDate: Date;
   examiner?: string;
   notes?: string;
+  status?: "Pass" | "Fail";
   createdAt?: Date;
 };
 
@@ -23,6 +24,7 @@ const beltProgressionSchema = new mongoose.Schema(
     awardedDate: { type: Date, required: true, default: Date.now },
     examiner: { type: String },
     notes: { type: String },
+    status: { type: String, enum: ["Pass", "Fail"], default: "Pass" },
   },
   { timestamps: true }
 );

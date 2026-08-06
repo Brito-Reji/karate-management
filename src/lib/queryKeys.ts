@@ -14,4 +14,9 @@ export const queryKeys = {
     byDojo:      (dojoId)               => ['students', 'byDojo', dojoId],
     beltHistory: (id)                    => ['students', 'beltHistory', id],
   },
+
+  tests: {
+    all:    ()                         => ['tests'],
+    recent: (page = 1, limit = 10)    => ['tests', 'recent', { page, limit }],
+  },
 };

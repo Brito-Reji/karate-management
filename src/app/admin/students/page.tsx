@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from '@/hooks/useStudents';
+import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
 import SearchableSelect from '@/components/SearchableSelect';
+import DojoSelect from '@/components/DojoSelect';
 
 function SkeletonRows() {
   return (
@@ -82,6 +83,7 @@ function StudentsContent() {
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
+  const activateStudent = useActivateStudent();
 
   const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -127,12 +129,16 @@ function StudentsContent() {
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phoneNumber) return;
+    if (!formData.name) return;
     setFormError('');
 
     const payload = {
-      ...formData,
-      gender: formData.gender as "Male" | "Female" | "Other" | undefined || undefined,
+      name: formData.name,
+      belt: formData.belt,
+      dojoId: formData.dojoId || undefined,
+      phoneNumber: formData.phoneNumber.trim() || undefined,
+      gender: (formData.gender as "Male" | "Female" | "Other" | undefined) || undefined,
+      dob: formData.dob || undefined,
     };
 
     if (editingStudent) {
@@ -179,7 +185,7 @@ function StudentsContent() {
 
         <button
           onClick={openCreateModal}
-          className="h-10 px-4 bg-zinc-100 hover:bg-white active:scale-[0.98] text-zinc-950 text-xs font-medium rounded-lg transition-all flex items-center justify-center space-x-2 self-start sm:self-auto shrink-0"
+          className="h-10 w-full sm:w-auto px-4 bg-zinc-100 hover:bg-white active:scale-[0.98] text-zinc-950 text-xs font-medium rounded-lg transition-all flex items-center justify-center space-x-2 shrink-0"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
@@ -189,8 +195,8 @@ function StudentsContent() {
       </div>
 
       {/* search and filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="flex-1 relative">
+      <div className="flex flex-col gap-3">
+        <div className="relative w-full">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -213,59 +219,61 @@ function StudentsContent() {
           )}
         </div>
 
-        {/* dojo filter */}
-        <div className="relative w-full md:w-48">
-          <select
-            value={selectedDojoId}
-            onChange={(e) => setParams({ dojoId: e.target.value || null, page: null })}
-            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-          >
-            <option value="" className="bg-zinc-950">All Dojos</option>
-            {dojos.map((dojo) => (
-              <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
-                {dojo.name}
-              </option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-row gap-3">
+          {/* dojo filter */}
+          <div className="relative w-full md:w-48 min-w-0">
+            <select
+              value={selectedDojoId}
+              onChange={(e) => setParams({ dojoId: e.target.value || null, page: null })}
+              className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+            >
+              <option value="" className="bg-zinc-950">All Dojos</option>
+              {dojos.map((dojo) => (
+                <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
+                  {dojo.name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
           </div>
-        </div>
 
-        {/* belt filter */}
-        <div className="relative w-full md:w-48">
-          <select
-            value={selectedBelt}
-            onChange={(e) => setParams({ belt: e.target.value || null, page: null })}
-            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-          >
-            <option value="" className="bg-zinc-950">All Belts</option>
-            {BELTS.map((b) => (
-              <option key={b.name} value={b.name} className="bg-zinc-950">
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
+          {/* belt filter */}
+          <div className="relative w-full md:w-48 min-w-0">
+            <select
+              value={selectedBelt}
+              onChange={(e) => setParams({ belt: e.target.value || null, page: null })}
+              className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+            >
+              <option value="" className="bg-zinc-950">All Belts</option>
+              {BELTS.map((b) => (
+                <option key={b.name} value={b.name} className="bg-zinc-950">
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
           </div>
-        </div>
 
-        {(inputValue || selectedDojoId || selectedBelt) && (
-          <button
-            onClick={() => {
-              setInputValue('');
-              setParams({ search: null, dojoId: null, belt: null, page: null });
-            }}
-            className="h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
-          >
-            <span>Reset</span>
-          </button>
-        )}
+          {(inputValue || selectedDojoId || selectedBelt) && (
+            <button
+              onClick={() => {
+                setInputValue('');
+                setParams({ search: null, dojoId: null, belt: null, page: null });
+              }}
+              className="col-span-2 sm:col-span-1 h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+            >
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* student list */}
@@ -285,32 +293,32 @@ function StudentsContent() {
                 {students.map((student) => (
                   <div
                     key={student._id}
-                    className={`p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-white/[0.01] transition-colors group ${
+                    className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
                       student._id === '__optimistic__' ? 'opacity-50' : ''
                     }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2.5">
-                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{student.name}</h3>
-                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
+                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
                           {student.studentId ?? '—'}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 text-xs text-zinc-500">
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
                         <BeltDot belt={student.belt || 'White'} />
                         <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
-                        <span>•</span>
-                        <span>{dojoName(student.dojoId || '')}</span>
+                        <span className="text-zinc-700">•</span>
+                        <span className="break-words">{dojoName(student.dojoId || '')}</span>
                         {student.phoneNumber && (
                           <>
-                            <span>•</span>
+                            <span className="text-zinc-700">•</span>
                             <span className="font-mono">{student.phoneNumber}</span>
                           </>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end space-x-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
                       <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
                         student.status === 'Active'
                           ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
@@ -319,23 +327,35 @@ function StudentsContent() {
                         {student.status ?? 'Active'}
                       </span>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEditModal(student)}
                           disabled={student._id === '__optimistic__'}
-                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-7 px-3 rounded-md disabled:opacity-40"
+                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
                         >
                           Edit
                         </button>
-                        {student.status === 'Active' && (
+                        {student.status === 'Active' ? (
                           <button
                             onClick={() => {
                               if (confirm('Deactivate this student?')) deleteStudent.mutate(student._id);
                             }}
                             disabled={student._id === '__optimistic__'}
-                            className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-7 px-3 rounded-md disabled:opacity-40"
+                            className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
                           >
-                            Deactivate
+                            <span className="sm:hidden">Off</span>
+                            <span className="hidden sm:inline">Deactivate</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (confirm('Activate this student?')) activateStudent.mutate(student._id);
+                            }}
+                            disabled={student._id === '__optimistic__'}
+                            className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                          >
+                            <span className="sm:hidden">On</span>
+                            <span className="hidden sm:inline">Activate</span>
                           </button>
                         )}
                       </div>
@@ -379,10 +399,10 @@ function StudentsContent() {
 
       {/* add/edit modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 w-full h-full flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
 
-          <div className="w-full max-w-md bg-zinc-950 border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative max-h-[90vh] overflow-y-auto">
+          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
                 {editingStudent ? `Edit Student: ${editingStudent.studentId}` : 'Add New Student'}
@@ -413,7 +433,7 @@ function StudentsContent() {
               </div>
 
               {/* dojo selection */}
-              <SearchableSelect
+              <DojoSelect
                 label="Dojo Branch"
                 value={formData.dojoId}
                 onChange={(val) => setFormData({ ...formData, dojoId: val })}
@@ -432,10 +452,9 @@ function StudentsContent() {
 
               {/* phone */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Phone Number</label>
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Phone Number (optional)</label>
                 <input
                   type="tel"
-                  required
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   placeholder="e.g., 9876543210"
