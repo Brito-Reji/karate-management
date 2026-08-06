@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from '@/hooks/useStudents';
+import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
 import SearchableSelect from '@/components/SearchableSelect';
+import DojoSelect from '@/components/DojoSelect';
 
 function SkeletonRows() {
   return (
@@ -82,6 +83,7 @@ function StudentsContent() {
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
+  const activateStudent = useActivateStudent();
 
   const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -127,12 +129,16 @@ function StudentsContent() {
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phoneNumber) return;
+    if (!formData.name) return;
     setFormError('');
 
     const payload = {
-      ...formData,
-      gender: formData.gender as "Male" | "Female" | "Other" | undefined || undefined,
+      name: formData.name,
+      belt: formData.belt,
+      dojoId: formData.dojoId || undefined,
+      phoneNumber: formData.phoneNumber.trim() || undefined,
+      gender: (formData.gender as "Male" | "Female" | "Other" | undefined) || undefined,
+      dob: formData.dob || undefined,
     };
 
     if (editingStudent) {
@@ -329,7 +335,7 @@ function StudentsContent() {
                         >
                           Edit
                         </button>
-                        {student.status === 'Active' && (
+                        {student.status === 'Active' ? (
                           <button
                             onClick={() => {
                               if (confirm('Deactivate this student?')) deleteStudent.mutate(student._id);
@@ -339,6 +345,17 @@ function StudentsContent() {
                           >
                             <span className="sm:hidden">Off</span>
                             <span className="hidden sm:inline">Deactivate</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (confirm('Activate this student?')) activateStudent.mutate(student._id);
+                            }}
+                            disabled={student._id === '__optimistic__'}
+                            className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                          >
+                            <span className="sm:hidden">On</span>
+                            <span className="hidden sm:inline">Activate</span>
                           </button>
                         )}
                       </div>
@@ -416,7 +433,7 @@ function StudentsContent() {
               </div>
 
               {/* dojo selection */}
-              <SearchableSelect
+              <DojoSelect
                 label="Dojo Branch"
                 value={formData.dojoId}
                 onChange={(val) => setFormData({ ...formData, dojoId: val })}
@@ -435,10 +452,9 @@ function StudentsContent() {
 
               {/* phone */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Phone Number</label>
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">Phone Number (optional)</label>
                 <input
                   type="tel"
-                  required
                   value={formData.phoneNumber}
                   onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   placeholder="e.g., 9876543210"

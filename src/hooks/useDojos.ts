@@ -56,9 +56,21 @@ export function useCreateDojo() {
       ctx?.snapshot?.forEach(([key, data]) => qc.setQueryData(key, data));
     },
 
+    onSuccess: (dojo) => {
+      qc.setQueryData(
+        queryKeys.dojos.dropdown(),
+        (old: { _id: string; dojoId?: string; name: string; location: string }[] | undefined) => {
+          if (!old) return old;
+          if (old.some((d) => d._id === dojo._id)) return old;
+          return [{ _id: dojo._id, dojoId: dojo.dojoId, name: dojo.name, location: dojo.location }, ...old];
+        }
+      );
+    },
+
     // always refetch to sync real server state
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.dropdown() });
     },
   });
 }
