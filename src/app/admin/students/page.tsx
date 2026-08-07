@@ -80,15 +80,9 @@ function StudentsContent() {
 
   const { data: dojos = [] } = useAllDojos();
 
-  const students = Array.from(
-    new Map(
-      (listData?.pages.flatMap((page) => page.students) ?? []).map((student) => [
-        student._id,
-        student,
-      ])
-    ).values()
-  );
-  const totalStudents = listData?.pages[0]?.total;
+  const students = listData?.students ?? [];
+  const totalStudents = listData?.total;
+  const totalPages = listData?.totalPages ?? 1;
 
   const createStudent = useCreateStudent();
   const updateStudent = useUpdateStudent();

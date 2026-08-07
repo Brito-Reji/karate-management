@@ -56,30 +56,21 @@ function DojosContent() {
 
   const {
     data: listData,
-    isLoading: isInfiniteLoading,
-    isError: isInfiniteError,
-    error: infiniteError,
-    isFetching: isInfiniteFetching,
-    isStale: isInfiniteStale,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useInfiniteDojos(searchQuery, !isSearchActive);
+    isLoading: isListLoading,
+    isError: isListError,
+    error: listError,
+    isFetching: isListFetching,
+    isStale: isListStale,
+  } = useDojos(currentPage, isSearchActive ? "" : searchQuery, !isSearchActive);
 
-  const dojos = Array.from(
-    new Map(
-      (isSearchActive ? (searchData?.data ?? []) : (listData?.pages.flatMap((page) => page.data) ?? [])).map((dojo) => [
-        dojo._id,
-        dojo,
-      ])
-    ).values()
-  );
-  const totalDojos = isSearchActive ? searchData?.total : listData?.pages[0]?.total;
-  const isLoading = isSearchActive ? isSearchLoading : isInfiniteLoading;
-  const isError = isSearchActive ? isSearchError : isInfiniteError;
-  const error = isSearchActive ? searchError : infiniteError;
-  const isFetching = isSearchActive ? isSearchFetching : isInfiniteFetching;
-  const isStale = isSearchActive ? false : isInfiniteStale;
+  const dojos = isSearchActive ? (searchData?.data ?? []) : (listData?.data ?? []);
+  const totalDojos = listData?.total;
+  const totalPages = isSearchActive ? 1 : (listData?.totalPages ?? 1);
+  const isLoading = isSearchActive ? isSearchLoading : isListLoading;
+  const isError = isSearchActive ? isSearchError : isListError;
+  const error = isSearchActive ? searchError : listError;
+  const isFetching = isSearchActive ? isSearchFetching : isListFetching;
+  const isStale = isSearchActive ? false : isListStale;
 
   const createDojo = useCreateDojo();
   const updateDojo = useUpdateDojo();
