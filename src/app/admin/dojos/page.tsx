@@ -240,28 +240,33 @@ function DojosContent() {
           }`}>
             {dojos.length > 0 ? (
               <div className="divide-y divide-white/[0.04]">
-                {dojos.map((dojo) => (
+                {dojos.map((dojo, index) => (
                   <div
                     key={dojo._id}
                     className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
                       dojo._id === '__optimistic__' ? 'opacity-50' : ''
                     }`}
                   >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>
-                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                          {dojo.dojoId ?? '—'}
-                        </span>
-                      </div>
-                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                        <span className="text-zinc-400 font-medium break-words">
-                          {dojo.instructors && dojo.instructors.length > 0
-                            ? dojo.instructors.join(", ")
-                            : (dojo.instructor || '—')}
-                        </span>
-                        <span className="text-zinc-700">•</span>
-                        <span className="break-words">{dojo.location}</span>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <span className="mt-0.5 flex h-6 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-[10px] font-mono text-zinc-500">
+                        {index + 1}
+                      </span>
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                          <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>
+                          <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                            {dojo.dojoId ?? '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                          <span className="text-zinc-400 font-medium break-words">
+                            {dojo.instructors && dojo.instructors.length > 0
+                              ? dojo.instructors.join(", ")
+                              : (dojo.instructor || '—')}
+                          </span>
+                          <span className="text-zinc-700">•</span>
+                          <span className="break-words">{dojo.location}</span>
+                        </div>
                       </div>
                     </div>
 

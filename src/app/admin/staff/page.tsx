@@ -133,30 +133,35 @@ export default function StaffPage() {
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
           {users.length > 0 ? (
             <div className="divide-y divide-white/[0.04]">
-              {users.map((user) => (
+              {users.map((user, index) => (
                 <div
                   key={user._id}
                   className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group"
                 >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                      <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">
-                        {user.name}
-                      </h3>
-                      <span
-                        className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border capitalize ${
-                          user.role === 'admin'
-                            ? 'bg-zinc-100/10 border-zinc-500/30 text-zinc-200'
-                            : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
-                        }`}
-                      >
-                        {user.role}
-                      </span>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                      {user.email && <span className="break-all">{user.email}</span>}
-                      {user.email && user.phone && <span className="text-zinc-700">•</span>}
-                      {user.phone && <span className="font-mono">{user.phone}</span>}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="mt-0.5 flex h-6 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-[10px] font-mono text-zinc-500">
+                      {index + 1}
+                    </span>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">
+                          {user.name}
+                        </h3>
+                        <span
+                          className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border capitalize ${
+                            user.role === 'admin'
+                              ? 'bg-zinc-100/10 border-zinc-500/30 text-zinc-200'
+                              : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                        {user.email && <span className="break-all">{user.email}</span>}
+                        {user.email && user.phone && <span className="text-zinc-700">•</span>}
+                        {user.phone && <span className="font-mono">{user.phone}</span>}
+                      </div>
                     </div>
                   </div>
                   {user.createdAt && (
