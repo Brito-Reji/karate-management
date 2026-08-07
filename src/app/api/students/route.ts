@@ -1,8 +1,6 @@
 import connectDB from "@/lib/db";
 import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
-import BeltProgression from "@/models/BeltProgression";
 import { getNextSequence } from "@/models/Counter";
-import { BELTS } from "@/lib/constants";
 import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
@@ -73,8 +71,6 @@ export async function POST(request) {
 
     const nextId = await getNextSequence("studentId");
 
-    const beltInfo = BELTS.find((b) => b.name === belt);
-
     const student = await Student.create({
       studentId: String(nextId),
       name,
@@ -88,14 +84,6 @@ export async function POST(request) {
       status,
       createdBy: user.userId,
       updatedBy: user.userId,
-    });
-
-    await BeltProgression.create({
-      studentId: student._id,
-      beltName: belt,
-      rank: beltInfo?.rank ?? 1,
-      awardedDate: student.admissionDate || new Date(),
-      notes: "Initial belt on enrollment",
     });
 
     return NextResponse.json({ success: true, student });
