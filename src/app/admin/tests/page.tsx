@@ -483,7 +483,7 @@ function TestsContent() {
                 isHistoryLoading ? 'opacity-60' : 'opacity-100'
               }`}>
                 {beltHistory.length > 0 ? (
-                  <div className="max-h-[min(28rem,55vh)] overflow-y-auto overscroll-contain scroll-smooth divide-y divide-white/[0.04]">
+                  <div className="divide-y divide-white/[0.04] sm:max-h-[min(28rem,55vh)] sm:overflow-y-auto sm:overscroll-contain sm:scroll-smooth">
                     {beltHistory.map((entry, index) => (
                       <div
                         key={entry._id}
@@ -581,9 +581,9 @@ function TestsContent() {
 
       {/* edit history entry modal */}
       {editingEntry && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto sm:overflow-visible">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingEntry(null)} />
-          <div className="relative w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)] max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="relative w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)] sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center space-x-2">
                 <BeltDot belt={editingEntry.beltName} />
@@ -729,7 +729,7 @@ function TestsContent() {
               {recentTests.length > 0 ? (
                 <div
                   ref={recentListRef}
-                  className="max-h-[min(28rem,55vh)] overflow-y-auto overscroll-contain scroll-smooth divide-y divide-white/[0.04]"
+                  className="divide-y divide-white/[0.04] sm:max-h-[min(28rem,55vh)] sm:overflow-y-auto sm:overscroll-contain sm:scroll-smooth"
                 >
                   {recentTests.map((entry) => {
                     const isFail = entry.status === 'Fail';

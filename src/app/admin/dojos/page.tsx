@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
+import { useInfiniteDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
 import useDebounce from '@/hooks/useDebounce';
 import { useSearchDojos } from '@/hooks/useSearchDojos';
 
@@ -34,7 +34,6 @@ function DojosContent() {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  const currentPage = Number(searchParams.get('page'))   || 1;
   const searchQuery = searchParams.get('search') || '';
 
   const [inputValue, setInputValue] = useState(searchQuery);
@@ -42,6 +41,7 @@ function DojosContent() {
   const [editingDojo, setEditingDojo]   = useState(null);
   const [formData, setFormData] = useState({ name: '', location: '', instructors: [''] });
   const [formError, setFormError] = useState('');
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const debouncedSearch = useDebounce(inputValue, 300);
   const isSearchActive = debouncedSearch.trim().length >= 2;
@@ -56,21 +56,30 @@ function DojosContent() {
 
   const {
     data: listData,
-    isLoading: isListLoading,
-    isError: isListError,
-    error: listError,
-    isFetching: isListFetching,
-    isStale: isListStale,
-  } = useDojos(currentPage, isSearchActive ? "" : searchQuery, !isSearchActive);
+    isLoading: isInfiniteLoading,
+    isError: isInfiniteError,
+    error: infiniteError,
+    isFetching: isInfiniteFetching,
+    isStale: isInfiniteStale,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteDojos(searchQuery, !isSearchActive);
 
-  const dojos = isSearchActive ? (searchData?.data ?? []) : (listData?.data ?? []);
-  const totalDojos = listData?.total;
-  const totalPages = isSearchActive ? 1 : (listData?.totalPages ?? 1);
-  const isLoading = isSearchActive ? isSearchLoading : isListLoading;
-  const isError = isSearchActive ? isSearchError : isListError;
-  const error = isSearchActive ? searchError : listError;
-  const isFetching = isSearchActive ? isSearchFetching : isListFetching;
-  const isStale = isSearchActive ? false : isListStale;
+  const dojos = Array.from(
+    new Map(
+      (isSearchActive ? (searchData?.data ?? []) : (listData?.pages.flatMap((page) => page.data) ?? [])).map((dojo) => [
+        dojo._id,
+        dojo,
+      ])
+    ).values()
+  );
+  const totalDojos = isSearchActive ? searchData?.total : listData?.pages[0]?.total;
+  const isLoading = isSearchActive ? isSearchLoading : isInfiniteLoading;
+  const isError = isSearchActive ? isSearchError : isInfiniteError;
+  const error = isSearchActive ? searchError : infiniteError;
+  const isFetching = isSearchActive ? isSearchFetching : isInfiniteFetching;
+  const isStale = isSearchActive ? false : isInfiniteStale;
 
   const createDojo = useCreateDojo();
   const updateDojo = useUpdateDojo();
@@ -86,9 +95,25 @@ function DojosContent() {
 
   useEffect(() => {
     if (debouncedSearch !== searchQuery) {
-      setParams({ search: debouncedSearch || null, page: null });
+      setParams({ search: debouncedSearch || null });
     }
   }, [debouncedSearch, searchQuery, setParams]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || isSearchActive || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '240px' }
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearchActive]);
 
   const openCreateModal = () => {
     setEditingDojo(null);
@@ -285,28 +310,20 @@ function DojosContent() {
             )}
           </div>
 
-          {/* SECTION: MINIMALIST PAGINATION CONTROLS */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-1 pt-2">
-              <p className="text-[11px] text-zinc-600 font-mono">
-                Page {currentPage} of {totalPages}
-              </p>
-              <div className="flex items-center space-x-2">
+          {!isSearchActive && (
+            <div ref={loadMoreRef} className="flex justify-center px-1 pt-2">
+              {hasNextPage ? (
                 <button
-                  onClick={() => setParams({ page: String(currentPage - 1) })}
-                  disabled={currentPage === 1 || isFetching}
-                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
+                  type="button"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="h-9 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-50 text-xs text-zinc-400 hover:text-white transition-all"
                 >
-                  Previous
+                  {isFetchingNextPage ? 'Loading more…' : 'Load more'}
                 </button>
-                <button
-                  onClick={() => setParams({ page: String(currentPage + 1) })}
-                  disabled={currentPage === totalPages || isFetching}
-                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
-                >
-                  Next
-                </button>
-              </div>
+              ) : dojos.length > 0 ? (
+                <p className="text-[11px] text-zinc-600 font-mono">All dojos loaded</p>
+              ) : null}
             </div>
           )}
         </>
@@ -314,10 +331,10 @@ function DojosContent() {
 
       {/* SECTION: UNIFIED DATA MUTATION MODAL OVERLAY */}
       {isModalOpen && (
-        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn overflow-y-auto sm:overflow-visible">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
 
-          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
                 {editingDojo ? `Modify Branch Info: ${editingDojo.dojoId}` : 'Create New Dojo Branch'}
