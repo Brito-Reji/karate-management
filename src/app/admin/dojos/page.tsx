@@ -64,6 +64,7 @@ function DojosContent() {
   } = useDojos(currentPage, isSearchActive ? "" : searchQuery, !isSearchActive);
 
   const dojos = isSearchActive ? (searchData?.data ?? []) : (listData?.data ?? []);
+  const totalDojos = listData?.total;
   const totalPages = isSearchActive ? 1 : (listData?.totalPages ?? 1);
   const isLoading = isSearchActive ? isSearchLoading : isListLoading;
   const isError = isSearchActive ? isSearchError : isListError;
@@ -153,7 +154,9 @@ function DojosContent() {
       {/* SECTION: UPPER FUNCTIONAL TITLE FRAME */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
         <div>
-          <h1 className="text-xl font-light tracking-tight text-zinc-100">Dojo Branches</h1>
+          <h1 className="text-xl font-light tracking-tight text-zinc-100">
+            Dojo Branches{typeof totalDojos === 'number' ? ` (${totalDojos})` : ''}
+          </h1>
           <p className="text-xs text-zinc-500 mt-1">Manage physical instruction facilities and location rosters.</p>
           <div className="mt-1.5">
             <StaleIndicator isFetching={isFetching && !isLoading} />
