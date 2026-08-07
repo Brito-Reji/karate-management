@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useInfiniteDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
 import useDebounce from '@/hooks/useDebounce';
 import { useSearchDojos } from '@/hooks/useSearchDojos';
+import RowIndexBadge from '@/components/RowIndexBadge';
 
 // skeleton shown during loading
 function SkeletonRows() {
@@ -174,10 +175,10 @@ function DojosContent() {
   const isSubmitting = createDojo.isPending || updateDojo.isPending;
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-7rem)] lg:h-[calc(100dvh-8rem)] min-h-0 flex flex-col gap-6 animate-fadeIn">
 
       {/* SECTION: UPPER FUNCTIONAL TITLE FRAME */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
         <div>
           <h1 className="text-xl font-light tracking-tight text-zinc-100">
             Dojo Branches{typeof totalDojos === 'number' ? ` (${totalDojos})` : ''}
@@ -203,7 +204,7 @@ function DojosContent() {
       </div>
 
       {/* SECTION: POWER FILTER SEARCH CONTROLLER INPUT BAR */}
-      <div className="w-full max-w-xl relative">
+      <div className="shrink-0 w-full max-w-xl relative">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -227,41 +228,46 @@ function DojosContent() {
       </div>
 
       {/* SECTION: RESPONSIVE DATA REGISTRY GRID LISTING */}
-      {isLoading ? (
-        <SkeletonRows />
-      ) : isError ? (
-        <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
-          {error.message}
-        </div>
-      ) : (
-        <>
-          <div className={`bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <SkeletonRows />
+        ) : isError ? (
+          <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
+            {error.message}
+          </div>
+        ) : (
+          <div className={`h-full bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
             isFetching ? 'opacity-60' : 'opacity-100'
           }`}>
-            {dojos.length > 0 ? (
-              <div className="divide-y divide-white/[0.04]">
-                {dojos.map((dojo) => (
+            <div className="h-full overflow-y-auto overscroll-contain">
+              {dojos.length > 0 ? (
+                <>
+                  <div className="divide-y divide-white/[0.04]">
+                    {dojos.map((dojo, index) => (
                   <div
                     key={dojo._id}
                     className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
                       dojo._id === '__optimistic__' ? 'opacity-50' : ''
                     }`}
                   >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>
-                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                          {dojo.dojoId ?? '—'}
-                        </span>
-                      </div>
-                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                        <span className="text-zinc-400 font-medium break-words">
-                          {dojo.instructors && dojo.instructors.length > 0
-                            ? dojo.instructors.join(", ")
-                            : (dojo.instructor || '—')}
-                        </span>
-                        <span className="text-zinc-700">•</span>
-                        <span className="break-words">{dojo.location}</span>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <RowIndexBadge index={index} />
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                          <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>
+                          <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                            {dojo.dojoId ?? '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                          <span className="text-zinc-400 font-medium break-words">
+                            {dojo.instructors && dojo.instructors.length > 0
+                              ? dojo.instructors.join(", ")
+                              : (dojo.instructor || '—')}
+                          </span>
+                          <span className="text-zinc-700">•</span>
+                          <span className="break-words">{dojo.location}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -292,42 +298,43 @@ function DojosContent() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              // empty state
-              <div className="p-12 text-center space-y-2">
-                <p className="text-xs text-zinc-600 font-mono">No active dojo profiles match your search filter criteria.</p>
-                {searchQuery && (
-                  <button
-                    onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
-                    className="text-[11px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-                  >
-                    Clear filter
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                    ))}
+                  </div>
 
-          {!isSearchActive && (
-            <div ref={loadMoreRef} className="flex justify-center px-1 pt-2">
-              {hasNextPage ? (
-                <button
-                  type="button"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className="h-9 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-50 text-xs text-zinc-400 hover:text-white transition-all"
-                >
-                  {isFetchingNextPage ? 'Loading more…' : 'Load more'}
-                </button>
-              ) : dojos.length > 0 ? (
-                <p className="text-[11px] text-zinc-600 font-mono">All dojos loaded</p>
-              ) : null}
+                  {!isSearchActive && (
+                    <div ref={loadMoreRef} className="flex justify-center px-1 py-4">
+                      {hasNextPage ? (
+                        <button
+                          type="button"
+                          onClick={() => fetchNextPage()}
+                          disabled={isFetchingNextPage}
+                          className="h-9 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-50 text-xs text-zinc-400 hover:text-white transition-all"
+                        >
+                          {isFetchingNextPage ? 'Loading more…' : 'Load more'}
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-zinc-600 font-mono">All dojos loaded</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-12 text-center space-y-2">
+                  <p className="text-xs text-zinc-600 font-mono">No active dojo profiles match your search filter criteria.</p>
+                  {searchQuery && (
+                    <button
+                      onClick={() => { setInputValue(''); setParams({ search: null, page: null }); }}
+                      className="text-[11px] text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                    >
+                      Clear filter
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* SECTION: UNIFIED DATA MUTATION MODAL OVERLAY */}
       {isModalOpen && (

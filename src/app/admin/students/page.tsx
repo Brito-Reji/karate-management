@@ -8,6 +8,7 @@ import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
 import SearchableSelect from '@/components/SearchableSelect';
 import DojoSelect from '@/components/DojoSelect';
+import RowIndexBadge from '@/components/RowIndexBadge';
 
 function SkeletonRows() {
   return (
@@ -320,31 +321,34 @@ function StudentsContent() {
               {students.length > 0 ? (
                 <>
                   <div className="divide-y divide-white/[0.04]">
-                    {students.map((student) => (
+                    {students.map((student, index) => (
                       <div
                         key={student._id}
                         className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
                           student._id === '__optimistic__' ? 'opacity-50' : ''
                         }`}
                       >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                            <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
-                            <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                              {student.studentId ?? '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                            <BeltDot belt={student.belt || 'White'} />
-                            <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
-                            <span className="text-zinc-700">•</span>
-                            <span className="break-words">{dojoName(student.dojoId || '')}</span>
-                            {student.phoneNumber && (
-                              <>
-                                <span className="text-zinc-700">•</span>
-                                <span className="font-mono">{student.phoneNumber}</span>
-                              </>
-                            )}
+                        <div className="flex items-start gap-3 min-w-0">
+                          <RowIndexBadge index={index} />
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                              <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
+                              <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                                {student.studentId ?? '—'}
+                              </span>
+                            </div>
+                            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                              <BeltDot belt={student.belt || 'White'} />
+                              <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
+                              <span className="text-zinc-700">•</span>
+                              <span className="break-words">{dojoName(student.dojoId || '')}</span>
+                              {student.phoneNumber && (
+                                <>
+                                  <span className="text-zinc-700">•</span>
+                                  <span className="font-mono">{student.phoneNumber}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
 
