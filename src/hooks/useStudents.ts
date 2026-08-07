@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   type Student,
@@ -12,6 +12,7 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  fetchStudents,
 } from '@/queries/studentQueries';
 
 // --- queries ---
@@ -20,6 +21,19 @@ export function useStudents(page: number, search: string, filters: StudentFilter
   return useQuery({
     ...studentListQuery(page, search, filters),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useInfiniteStudents(search: string, filters: StudentFilters) {
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.students.all(), 'infinite', { search, ...filters }],
+    queryFn: ({ pageParam = 1 }) => fetchStudents({ page: pageParam as number, search, ...filters }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const page = lastPage.page ?? 1;
+      const totalPages = lastPage.totalPages ?? 1;
+      return page < totalPages ? page + 1 : undefined;
+    },
   });
 }
 

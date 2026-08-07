@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
+import { useInfiniteStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
@@ -47,7 +47,6 @@ function StudentsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentPage = Number(searchParams.get('page')) || 1;
   const searchQuery = searchParams.get('search') || '';
   const selectedBelt = searchParams.get('belt') || '';
   const selectedDojoId = searchParams.get('dojoId') || '';
@@ -64,6 +63,7 @@ function StudentsContent() {
     dob: '',
   });
   const [formError, setFormError] = useState('');
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const debouncedSearch = useDebounce(inputValue, 300);
 
@@ -73,7 +73,10 @@ function StudentsContent() {
     isError,
     error,
     isFetching,
-  } = useStudents(currentPage, debouncedSearch, { belt: selectedBelt, dojoId: selectedDojoId });
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteStudents(debouncedSearch, { belt: selectedBelt, dojoId: selectedDojoId });
 
   const { data: dojos = [] } = useAllDojos();
 
@@ -97,9 +100,25 @@ function StudentsContent() {
 
   useEffect(() => {
     if (debouncedSearch !== searchQuery) {
-      setParams({ search: debouncedSearch || null, page: null });
+      setParams({ search: debouncedSearch || null });
     }
   }, [debouncedSearch, searchQuery, setParams]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '240px' }
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   // get dojo name from id
   const dojoName = (dojoId: string) => {
@@ -172,10 +191,10 @@ function StudentsContent() {
   }));
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-7rem)] lg:h-[calc(100dvh-8rem)] min-h-0 flex flex-col gap-6 animate-fadeIn">
 
       {/* header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/[0.04] pb-6">
         <div>
           <h1 className="text-xl font-light tracking-tight text-zinc-100">
             Students{typeof totalStudents === 'number' ? ` (${totalStudents})` : ''}
@@ -198,7 +217,7 @@ function StudentsContent() {
       </div>
 
       {/* search and filters */}
-      <div className="flex flex-col gap-3">
+      <div className="shrink-0 flex flex-col gap-3">
         <div className="relative w-full">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -227,7 +246,7 @@ function StudentsContent() {
           <div className="relative w-full md:w-48 min-w-0">
             <select
               value={selectedDojoId}
-              onChange={(e) => setParams({ dojoId: e.target.value || null, page: null })}
+              onChange={(e) => setParams({ dojoId: e.target.value || null })}
               className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
             >
               <option value="" className="bg-zinc-950">All Dojos</option>
@@ -248,7 +267,7 @@ function StudentsContent() {
           <div className="relative w-full md:w-48 min-w-0">
             <select
               value={selectedBelt}
-              onChange={(e) => setParams({ belt: e.target.value || null, page: null })}
+              onChange={(e) => setParams({ belt: e.target.value || null })}
               className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
             >
               <option value="" className="bg-zinc-950">All Belts</option>
@@ -269,7 +288,7 @@ function StudentsContent() {
             <button
               onClick={() => {
                 setInputValue('');
-                setParams({ search: null, dojoId: null, belt: null, page: null });
+                setParams({ search: null, dojoId: null, belt: null });
               }}
               className="col-span-2 sm:col-span-1 h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
             >
@@ -280,132 +299,126 @@ function StudentsContent() {
       </div>
 
       {/* student list */}
-      {isLoading ? (
-        <SkeletonRows />
-      ) : isError ? (
-        <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
-          {error.message}
-        </div>
-      ) : (
-        <>
-          <div className={`bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
+      <div className="flex-1 min-h-0">
+        {isLoading ? (
+          <SkeletonRows />
+        ) : isError ? (
+          <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
+            {error.message}
+          </div>
+        ) : (
+          <div className={`h-full bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl transition-opacity duration-200 ${
             isFetching ? 'opacity-60' : 'opacity-100'
           }`}>
-            {students.length > 0 ? (
-              <div className="divide-y divide-white/[0.04]">
-                {students.map((student) => (
-                  <div
-                    key={student._id}
-                    className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
-                      student._id === '__optimistic__' ? 'opacity-50' : ''
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                        <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
-                        <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                          {student.studentId ?? '—'}
-                        </span>
-                      </div>
-                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                        <BeltDot belt={student.belt || 'White'} />
-                        <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
-                        <span className="text-zinc-700">•</span>
-                        <span className="break-words">{dojoName(student.dojoId || '')}</span>
-                        {student.phoneNumber && (
-                          <>
+            <div className="h-full overflow-y-auto overscroll-contain">
+              {students.length > 0 ? (
+                <>
+                  <div className="divide-y divide-white/[0.04]">
+                    {students.map((student) => (
+                      <div
+                        key={student._id}
+                        className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group ${
+                          student._id === '__optimistic__' ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                            <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
+                            <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                              {student.studentId ?? '—'}
+                            </span>
+                          </div>
+                          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                            <BeltDot belt={student.belt || 'White'} />
+                            <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
                             <span className="text-zinc-700">•</span>
-                            <span className="font-mono">{student.phoneNumber}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                            <span className="break-words">{dojoName(student.dojoId || '')}</span>
+                            {student.phoneNumber && (
+                              <>
+                                <span className="text-zinc-700">•</span>
+                                <span className="font-mono">{student.phoneNumber}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
-                      <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
-                        student.status === 'Active'
-                          ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-500'
-                      }`}>
-                        {student.status ?? 'Active'}
-                      </span>
+                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
+                          <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
+                            student.status === 'Active'
+                              ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                          }`}>
+                            {student.status ?? 'Active'}
+                          </span>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openEditModal(student)}
-                          disabled={student._id === '__optimistic__'}
-                          className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
-                        >
-                          Edit
-                        </button>
-                        {student.status === 'Active' ? (
-                          <button
-                            onClick={() => {
-                              if (confirm('Deactivate this student?')) deleteStudent.mutate(student._id);
-                            }}
-                            disabled={student._id === '__optimistic__'}
-                            className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
-                          >
-                            <span className="sm:hidden">Off</span>
-                            <span className="hidden sm:inline">Deactivate</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              if (confirm('Activate this student?')) activateStudent.mutate(student._id);
-                            }}
-                            disabled={student._id === '__optimistic__'}
-                            className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
-                          >
-                            <span className="sm:hidden">On</span>
-                            <span className="hidden sm:inline">Activate</span>
-                          </button>
-                        )}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditModal(student)}
+                              disabled={student._id === '__optimistic__'}
+                              className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                            >
+                              Edit
+                            </button>
+                            {student.status === 'Active' ? (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Deactivate this student?')) deleteStudent.mutate(student._id);
+                                }}
+                                disabled={student._id === '__optimistic__'}
+                                className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                              >
+                                <span className="sm:hidden">Off</span>
+                                <span className="hidden sm:inline">Deactivate</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Activate this student?')) activateStudent.mutate(student._id);
+                                }}
+                                disabled={student._id === '__optimistic__'}
+                                className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                              >
+                                <span className="sm:hidden">On</span>
+                                <span className="hidden sm:inline">Activate</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-12 text-center space-y-2">
-                <p className="text-xs text-zinc-600 font-mono">No students found.</p>
-              </div>
-            )}
-          </div>
 
-          {/* pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-1 pt-2">
-              <p className="text-[11px] text-zinc-600 font-mono">
-                Page {currentPage} of {totalPages}
-              </p>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setParams({ page: String(currentPage - 1) })}
-                  disabled={currentPage === 1 || isFetching}
-                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setParams({ page: String(currentPage + 1) })}
-                  disabled={currentPage === totalPages || isFetching}
-                  className="px-3 h-8 rounded border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-20 disabled:hover:bg-transparent text-xs text-zinc-400 hover:text-white transition-all"
-                >
-                  Next
-                </button>
-              </div>
+                  <div ref={loadMoreRef} className="flex justify-center px-1 py-4">
+                    {hasNextPage ? (
+                      <button
+                        type="button"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                        className="h-9 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] disabled:opacity-50 text-xs text-zinc-400 hover:text-white transition-all"
+                      >
+                        {isFetchingNextPage ? 'Loading more…' : 'Load more'}
+                      </button>
+                    ) : (
+                      <p className="text-[11px] text-zinc-600 font-mono">All students loaded</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-12 text-center space-y-2">
+                  <p className="text-xs text-zinc-600 font-mono">No students found.</p>
+                </div>
+              )}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* add/edit modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn overflow-y-auto sm:overflow-visible">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
 
-          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
                 {editingStudent ? `Edit Student: ${editingStudent.studentId}` : 'Add New Student'}

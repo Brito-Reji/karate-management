@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   type Dojo,
@@ -8,6 +8,7 @@ import {
   type DojoListResponse,
   dojoListQuery,
   dojoDetailQuery,
+  fetchDojos,
   createDojo,
   updateDojo,
 } from '@/queries/dojoQueries';
@@ -18,6 +19,20 @@ export function useDojos(page: number, search: string, enabled = true) {
   return useQuery({
     ...dojoListQuery(page, search),
     placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+export function useInfiniteDojos(search: string, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.dojos.all(), 'infinite', { search }],
+    queryFn: ({ pageParam = 1 }) => fetchDojos({ page: pageParam as number, search }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const page = lastPage.page ?? 1;
+      const totalPages = lastPage.totalPages ?? 1;
+      return page < totalPages ? page + 1 : undefined;
+    },
     enabled,
   });
 }
