@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useInfiniteDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
 import useDebounce from '@/hooks/useDebounce';
 import { useSearchDojos } from '@/hooks/useSearchDojos';
+import RowIndexBadge from '@/components/RowIndexBadge';
 
 // skeleton shown during loading
 function SkeletonRows() {
@@ -250,9 +251,7 @@ function DojosContent() {
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
-                      <span className="mt-0.5 flex h-6 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-[10px] font-mono text-zinc-500">
-                        {index + 1}
-                      </span>
+                      <RowIndexBadge index={index} />
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
                           <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{dojo.name}</h3>

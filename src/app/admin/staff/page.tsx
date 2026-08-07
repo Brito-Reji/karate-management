@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import RowIndexBadge from '@/components/RowIndexBadge';
 
 type StaffUser = {
   _id: string;
@@ -139,9 +140,7 @@ export default function StaffPage() {
                   className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group"
                 >
                   <div className="flex items-start gap-3 min-w-0">
-                    <span className="mt-0.5 flex h-6 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-[10px] font-mono text-zinc-500">
-                      {index + 1}
-                    </span>
+                    <RowIndexBadge index={index} />
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
                         <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">

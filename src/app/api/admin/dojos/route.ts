@@ -4,9 +4,6 @@ import connectDB from "@/lib/db"
 import { attachDojoStudentCounts } from "@/lib/dojoStudentCounts"
 import { requireStaff } from "@/lib/requireAuth"
 
-
-
-
 export async function POST(request) {
   const { error } = await requireStaff();
   if (error) return error;
