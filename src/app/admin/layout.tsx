@@ -3,21 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { meQuery } from '@/queries/authQueries';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-
-  useEffect(() => {
-    if (pathname === '/admin/login') return;
-    fetch('/api/admin/me')
-      .then((r) => r.json())
-      .then((data) => { if (data.success) setCurrentUser(data.user); })
-      .catch(() => {});
-  }, [pathname]);
+  const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery({
+    ...meQuery,
+    enabled: pathname !== '/admin/login',
+  });
 
   // close drawer on navigation
   useEffect(() => {
@@ -34,6 +32,7 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' });
+    queryClient.removeQueries({ queryKey: meQuery.queryKey });
     router.push('/admin/login');
   };
 

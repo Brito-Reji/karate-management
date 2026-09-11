@@ -26,7 +26,7 @@ export default function DojoSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  const [newDojo, setNewDojo] = useState({ name: '', location: '' });
+  const [newDojo, setNewDojo] = useState({ name: '', location: '', instructor: '' });
   const [addError, setAddError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const createDojo = useCreateDojo();
@@ -52,22 +52,25 @@ export default function DojoSelect({
   const openAddForm = (prefillName = '') => {
     setIsAdding(true);
     setAddError('');
-    setNewDojo({ name: prefillName, location: '' });
+    setNewDojo({ name: prefillName, location: '', instructor: '' });
   };
 
   const handleCreateDojo = () => {
-    if (!newDojo.name.trim() || !newDojo.location.trim()) return;
+    const name = newDojo.name.trim();
+    const location = newDojo.location.trim();
+    const instructor = newDojo.instructor.trim();
+    if (!name || !location || !instructor) return;
     setAddError('');
 
     createDojo.mutate(
-      { name: newDojo.name.trim(), location: newDojo.location.trim() },
+      { name, location, instructors: [instructor] },
       {
         onSuccess: (dojo) => {
           onChange(dojo._id);
           setIsOpen(false);
           setIsAdding(false);
           setSearch('');
-          setNewDojo({ name: '', location: '' });
+          setNewDojo({ name: '', location: '', instructor: '' });
         },
         onError: (err) => setAddError(err.message),
       }
@@ -144,6 +147,19 @@ export default function DojoSelect({
                   placeholder="Location"
                   className="w-full h-8 px-2.5 rounded bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-all"
                 />
+                <input
+                  type="text"
+                  value={newDojo.instructor}
+                  onChange={(e) => setNewDojo({ ...newDojo, instructor: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCreateDojo();
+                    }
+                  }}
+                  placeholder="Instructor name"
+                  className="w-full h-8 px-2.5 rounded bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition-all"
+                />
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
@@ -158,7 +174,12 @@ export default function DojoSelect({
                   <button
                     type="button"
                     onClick={handleCreateDojo}
-                    disabled={createDojo.isPending || !newDojo.name.trim() || !newDojo.location.trim()}
+                    disabled={
+                      createDojo.isPending
+                      || !newDojo.name.trim()
+                      || !newDojo.location.trim()
+                      || !newDojo.instructor.trim()
+                    }
                     className="flex-1 h-8 rounded bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium transition-colors disabled:opacity-50"
                   >
                     {createDojo.isPending ? 'Adding...' : 'Add Dojo'}

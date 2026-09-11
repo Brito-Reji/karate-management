@@ -14,6 +14,9 @@ export const metadata = {
   description: "Manage students, belts, and dojos with precision",
 };
 
+/** Pin functions next to a Mumbai Atlas cluster (change if Atlas is elsewhere). */
+export const preferredRegion = "bom1";
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,

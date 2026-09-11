@@ -1,5 +1,6 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
+import { ensureSharedPhoneAllowed } from "@/models/Student";
 import { hashPassword } from "@/lib/password";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await connectDB();
+    await ensureSharedPhoneAllowed();
 
     const exists = await User.findOne({
       $or: [{ email }, { phone }],

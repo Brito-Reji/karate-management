@@ -6,21 +6,40 @@ if (!MONGO_URI) {
   throw new Error("MONGO_URI is missing in .env.local");
 }
 
-// cache connection across hot reloads in dev
-let cached = global.mongoose;
+const mongoUri: string = MONGO_URI;
 
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
+type MongooseCache = {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+};
+
+declare global {
+  var mongooseCache: MongooseCache | undefined;
 }
+
+const cached: MongooseCache = global.mongooseCache ?? { conn: null, promise: null };
+global.mongooseCache = cached;
 
 async function connectDB() {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGO_URI);
+    cached.promise = mongoose.connect(mongoUri, {
+      bufferCommands: false,
+      maxPoolSize: 1,
+      minPoolSize: 0,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
   }
 
-  cached.conn = await cached.promise;
+  try {
+    cached.conn = await cached.promise;
+  } catch (error) {
+    cached.promise = null;
+    throw error;
+  }
+
   return cached.conn;
 }
 

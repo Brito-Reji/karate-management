@@ -42,6 +42,10 @@ const dojoSchema = new mongoose.Schema(
   }
 );
 
+dojoSchema.index({ createdAt: -1 });
+dojoSchema.index({ name: 1 });
+dojoSchema.index({ location: 1 });
+
 const Dojo =
   (mongoose.models.Dojo as Model<DojoDocument> | undefined) ||
   mongoose.model<DojoDocument>("Dojo", dojoSchema);

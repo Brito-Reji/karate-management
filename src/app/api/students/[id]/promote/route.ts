@@ -15,7 +15,7 @@ export async function POST(request, { params }) {
     const { id } = await params;
     const { beltName, awardedDate, examiner, notes, status = "Pass" } = await request.json();
 
-    const student = await Student.findById(id);
+    const student = await Student.findById(id).lean();
     if (!student) {
       return NextResponse.json(
         { success: false, message: "Student not found" },
@@ -45,7 +45,7 @@ export async function POST(request, { params }) {
         id,
         { belt: beltName, updatedBy: user.userId, updatedAt: new Date() },
         { new: true }
-      );
+      ).lean();
     }
 
     const progression = await BeltProgression.create({

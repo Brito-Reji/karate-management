@@ -12,10 +12,9 @@ export async function GET(request, { params }) {
     await connectDB();
     const { id } = await params;
 
-    const history = await BeltProgression.find({ studentId: id }).sort({
-      awardedDate: -1,
-      createdAt: -1,
-    });
+    const history = await BeltProgression.find({ studentId: id })
+      .sort({ awardedDate: -1, createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ success: true, history });
   } catch (error) {

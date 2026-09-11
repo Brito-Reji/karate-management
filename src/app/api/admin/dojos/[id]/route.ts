@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import Dojo from "@/models/Dojo";
 import connectDB from "@/lib/db";
 import { requireStaff } from "@/lib/requireAuth";
+import { revalidateDojosCache } from "@/lib/cacheTags";
+import { normalizeDojo } from "@/lib/dojoQueriesServer";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -32,7 +34,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         instructors: finalInstructors,
       },
       { new: true, runValidators: true }
-    );
+    ).lean();
 
     if (!dojo) {
       return NextResponse.json(
@@ -41,14 +43,12 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       );
     }
 
-    const d = dojo.toObject();
-    if (!d.instructors || d.instructors.length === 0) {
-      d.instructors = d.instructor
-        ? d.instructor.split(',').map((s) => s.trim()).filter(Boolean)
-        : [];
-    }
+    revalidateDojosCache();
 
-    return NextResponse.json({ success: true, dojo: d });
+    return NextResponse.json({
+      success: true,
+      dojo: normalizeDojo(dojo as Record<string, unknown>),
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Failed to update dojo" },

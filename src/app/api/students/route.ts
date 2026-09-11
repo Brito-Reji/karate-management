@@ -1,21 +1,24 @@
 import connectDB from "@/lib/db";
-import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
+import Student from "@/models/Student";
 import { getNextSequence } from "@/models/Counter";
 import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
+import { prefixRegex } from "@/lib/mongoSearch";
+import { revalidateDojosCache } from "@/lib/cacheTags";
 import { NextResponse } from "next/server";
 
-// GET all students with pagination + search + dojo filter
+const LIST_SELECT =
+  "studentId name dojoId dob gender phoneNumber belt status createdAt createdBy";
+
 export async function GET(request) {
   const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
     await connectDB();
-    await ensureSharedPhoneAllowed();
 
     const { searchParams } = new URL(request.url);
     const page = Number(searchParams.get("page")) || 1;
-    const limit = Number(searchParams.get("limit")) || 10;
+    const limit = Math.min(Number(searchParams.get("limit")) || 10, 100);
     const search = searchParams.get("search")?.trim() || "";
     const dojoId = searchParams.get("dojoId")?.trim() || "";
     const belt = searchParams.get("belt")?.trim() || "";
@@ -24,10 +27,12 @@ export async function GET(request) {
     const filter: Record<string, unknown> = { ...getStudentScopeFilter(user) };
 
     if (search) {
+      const prefix = prefixRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { studentId: { $regex: search, $options: "i" } },
-        { phoneNumber: { $regex: search, $options: "i" } },
+        { studentId: search },
+        { name: prefix },
+        { studentId: prefix },
+        { phoneNumber: prefix },
       ];
     }
 
@@ -38,7 +43,12 @@ export async function GET(request) {
     const skip = (page - 1) * limit;
 
     const [students, total] = await Promise.all([
-      Student.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Student.find(filter)
+        .select(LIST_SELECT)
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .lean(),
       Student.countDocuments(filter),
     ]);
 
@@ -47,7 +57,7 @@ export async function GET(request) {
       students,
       total,
       page,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / Math.max(limit, 1)),
     });
   } catch (error) {
     return NextResponse.json(
@@ -57,14 +67,12 @@ export async function GET(request) {
   }
 }
 
-// CREATE a new student
 export async function POST(request) {
   const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
     await connectDB();
-    await ensureSharedPhoneAllowed();
 
     const { name, dojoId, dob, gender, phoneNumber, belt, pendingFees, image, status } =
       await request.json();
@@ -85,6 +93,8 @@ export async function POST(request) {
       createdBy: user.userId,
       updatedBy: user.userId,
     });
+
+    revalidateDojosCache();
 
     return NextResponse.json({ success: true, student });
   } catch (err) {

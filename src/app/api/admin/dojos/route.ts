@@ -1,8 +1,9 @@
-import {NextResponse} from "next/server"
-import Dojo from "@/models/Dojo"
-import connectDB from "@/lib/db"
-import { attachDojoStudentCounts } from "@/lib/dojoStudentCounts"
-import { requireStaff } from "@/lib/requireAuth"
+import { NextResponse } from "next/server";
+import Dojo from "@/models/Dojo";
+import connectDB from "@/lib/db";
+import { requireStaff } from "@/lib/requireAuth";
+import { revalidateDojosCache } from "@/lib/cacheTags";
+import { getCachedDojosWithCounts } from "@/lib/dojoQueriesServer";
 
 export async function POST(request) {
   const { error } = await requireStaff();
@@ -13,13 +14,14 @@ export async function POST(request) {
 
     const { name, location, instructor, instructors } = await request.json();
 
-    // auto-generate dojoId like DJ-01, DJ-02 ...
     const count = await Dojo.countDocuments();
-    const dojoId = `DJ-${String(count + 1).padStart(2, '0')}`;
+    const dojoId = `DJ-${String(count + 1).padStart(2, "0")}`;
 
     const finalInstructors = Array.isArray(instructors)
       ? instructors.filter(Boolean)
-      : (instructor ? [instructor] : []);
+      : instructor
+        ? [instructor]
+        : [];
 
     const finalInstructor = finalInstructors.join(", ");
 
@@ -30,6 +32,8 @@ export async function POST(request) {
       instructors: finalInstructors,
       dojoId,
     });
+
+    revalidateDojosCache();
 
     return NextResponse.json({
       success: true,
@@ -48,59 +52,24 @@ export async function POST(request) {
   }
 }
 
-// GET ALL DOJOS
 export async function GET(request) {
   const { error } = await requireStaff();
   if (error) return error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
 
-    const page  = Number(searchParams.get("page"))  || 1;
-    const limit = Number(searchParams.get("limit")) || 4;
+    const page = Number(searchParams.get("page")) || 1;
+    const limit = Math.min(Number(searchParams.get("limit")) || 4, 100);
     const search = searchParams.get("search")?.trim() || "";
 
-    const filter = search
-      ? {
-          $or: [
-            { name:        { $regex: search, $options: "i" } },
-            { location:    { $regex: search, $options: "i" } },
-            { instructor:  { $regex: search, $options: "i" } },
-            { instructors: { $regex: search, $options: "i" } },
-          ],
-        }
-      : {};
-
-    const skip = (page - 1) * limit;
-
-    const [dojos, total] = await Promise.all([
-      Dojo.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }),
-      Dojo.countDocuments(filter),
-    ]);
-
-    const mappedDojos = dojos.map((dojo) => {
-      const d = dojo.toObject();
-      if (!d.instructors || d.instructors.length === 0) {
-        d.instructors = d.instructor
-          ? d.instructor.split(',').map((s) => s.trim()).filter(Boolean)
-          : [];
-      }
-      return d;
-    });
-
-    const data = await attachDojoStudentCounts(mappedDojos);
+    const result = await getCachedDojosWithCounts(page, limit, search);
 
     return NextResponse.json({
       success: true,
-      data,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      ...result,
     });
   } catch (error) {
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
-
