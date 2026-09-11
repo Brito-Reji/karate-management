@@ -1,20 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { meQuery } from '@/queries/authQueries';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('/api/admin/me')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) setRole(data.user.role);
-      })
-      .catch(() => {});
-  }, []);
+  const { data: currentUser } = useQuery(meQuery);
+  const role = currentUser?.role ?? null;
 
   const sections = [
     {

@@ -186,10 +186,19 @@ function StudentsContent() {
 
   const isSubmitting = createStudent.isPending || updateStudent.isPending;
 
-  const dojoOptions = dojos.map((dojo) => ({
-    value: dojo._id,
-    label: `${dojo.name} — ${dojo.location}`,
-  }));
+  const dojoOptions = dojos.map((dojo) => {
+    const instructor =
+      dojo.instructors && dojo.instructors.length > 0
+        ? dojo.instructors.join(', ')
+        : dojo.instructor;
+    const base = `${dojo.name} — ${dojo.location}`;
+    const label = instructor ? `${base} · ${instructor}` : base;
+
+    return {
+      value: dojo._id,
+      label,
+    };
+  });
 
   const beltOptions = BELTS.map((b) => ({
     value: b.name,

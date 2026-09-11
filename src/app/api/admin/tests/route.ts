@@ -4,7 +4,16 @@ import "@/models/Student";
 import { requireAdmin } from "@/lib/requireAuth";
 import { type NextRequest, NextResponse } from "next/server";
 
-// GET recent belt tests across all students
+type PopulatedStudent = {
+  _id: unknown;
+  name?: string;
+  studentId?: string;
+  belt?: string;
+  dojoId?: string;
+  phoneNumber?: string;
+  status?: string;
+};
+
 export async function GET(request: NextRequest) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -17,61 +26,35 @@ export async function GET(request: NextRequest) {
     const page = Math.max(Number(searchParams.get("page")) || 1, 1);
     const skip = (page - 1) * limit;
 
-    const total = await BeltProgression.countDocuments({});
-    const history = await BeltProgression.find({})
-      .sort({ awardedDate: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate({
-        path: "studentId",
-        select: "name studentId belt dojoId phoneNumber status",
-      });
+    const [total, history] = await Promise.all([
+      BeltProgression.countDocuments({}),
+      BeltProgression.find({})
+        .sort({ awardedDate: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+          path: "studentId",
+          select: "name studentId belt dojoId phoneNumber status",
+        })
+        .lean(),
+    ]);
 
     const entries = history.map((entry) => {
-      const obj = entry.toObject() as {
-        _id: unknown;
-        beltName: string;
-        rank: number;
-        awardedDate: Date;
-        examiner?: string;
-        notes?: string;
-        status?: string;
-        createdAt?: Date;
-        studentId:
-          | {
-              _id: unknown;
-              name?: string;
-              studentId?: string;
-              belt?: string;
-              dojoId?: string;
-              phoneNumber?: string;
-              status?: string;
-            }
-          | unknown;
-      };
-
+      const populated = entry.studentId;
       const student =
-        obj.studentId && typeof obj.studentId === "object" && "name" in obj.studentId
-          ? (obj.studentId as {
-              _id: unknown;
-              name?: string;
-              studentId?: string;
-              belt?: string;
-              dojoId?: string;
-              phoneNumber?: string;
-              status?: string;
-            })
+        populated && typeof populated === "object" && "name" in populated
+          ? (populated as PopulatedStudent)
           : null;
 
       return {
-        _id: obj._id,
-        beltName: obj.beltName,
-        rank: obj.rank,
-        awardedDate: obj.awardedDate,
-        examiner: obj.examiner,
-        notes: obj.notes,
-        status: obj.status,
-        createdAt: obj.createdAt,
+        _id: entry._id,
+        beltName: entry.beltName,
+        rank: entry.rank,
+        awardedDate: entry.awardedDate,
+        examiner: entry.examiner,
+        notes: entry.notes,
+        status: entry.status,
+        createdAt: entry.createdAt,
         student: student
           ? {
               _id: student._id,
@@ -94,8 +77,9 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load recent tests";
     return NextResponse.json(
-      { success: false, message: "Failed to load recent tests", error: err.message },
+      { success: false, message: "Failed to load recent tests", error: message },
       { status: 500 }
     );
   }

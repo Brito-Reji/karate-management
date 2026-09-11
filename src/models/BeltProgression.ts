@@ -29,6 +29,8 @@ const beltProgressionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+beltProgressionSchema.index({ awardedDate: -1, createdAt: -1 });
+
 const BeltProgression =
   (mongoose.models.BeltProgression as Model<BeltProgressionDocument> | undefined) ||
   mongoose.model<BeltProgressionDocument>("BeltProgression", beltProgressionSchema);

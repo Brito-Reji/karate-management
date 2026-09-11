@@ -9,7 +9,7 @@ export async function GET(
   try {
     await connectDB();
     const { id } = await params;
-    const dojo = await Dojo.findOne({ dojoId: id });
+    const dojo = await Dojo.findOne({ dojoId: id }).lean();
 
     if (!dojo) {
       return NextResponse.json(

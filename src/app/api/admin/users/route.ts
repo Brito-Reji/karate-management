@@ -13,7 +13,8 @@ export async function GET() {
     await connectDB();
     const users = await User.find({ role: { $in: ["admin", "instructor"] } })
       .select("-password -refreshToken")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ success: true, users });
   } catch (err) {

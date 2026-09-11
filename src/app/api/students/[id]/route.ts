@@ -1,18 +1,17 @@
 import connectDB from "@/lib/db";
-import Student, { ensureSharedPhoneAllowed } from "@/models/Student";
+import Student from "@/models/Student";
 import { requireStaff, canAccessStudent, isDuplicateKeyError } from "@/lib/requireAuth";
+import { revalidateDojosCache } from "@/lib/cacheTags";
 import { NextResponse } from "next/server";
 
-// GET single student
 export async function GET(request, { params }) {
   const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
     await connectDB();
-    await ensureSharedPhoneAllowed();
     const { id } = await params;
-    const student = await Student.findById(id);
+    const student = await Student.findById(id).lean();
     if (!student) {
       return NextResponse.json(
         { success: false, message: "Student not found" },
@@ -34,14 +33,12 @@ export async function GET(request, { params }) {
   }
 }
 
-// UPDATE student
 export async function PUT(request, { params }) {
   const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
     await connectDB();
-    await ensureSharedPhoneAllowed();
     const { id } = await params;
     const {
       name,
@@ -58,7 +55,7 @@ export async function PUT(request, { params }) {
       status,
     } = await request.json();
 
-    const existing = await Student.findById(id);
+    const existing = await Student.findById(id).select("createdBy dojoId status").lean();
     if (!existing) {
       return NextResponse.json(
         { success: false, message: "Student not found" },
@@ -91,7 +88,9 @@ export async function PUT(request, { params }) {
         updatedAt: new Date(),
       },
       { new: true, runValidators: true }
-    );
+    ).lean();
+
+    revalidateDojosCache();
 
     return NextResponse.json({ success: true, message: "Student updated successfully", student });
   } catch (err) {
@@ -108,7 +107,6 @@ export async function PUT(request, { params }) {
   }
 }
 
-// SOFT DELETE
 export async function DELETE(request, { params }) {
   const { user, error } = await requireStaff();
   if (error) return error;
@@ -116,7 +114,7 @@ export async function DELETE(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const existing = await Student.findById(id);
+    const existing = await Student.findById(id).select("createdBy").lean();
     if (!existing) {
       return NextResponse.json(
         { success: false, message: "Student not found" },
@@ -134,7 +132,10 @@ export async function DELETE(request, { params }) {
       id,
       { status: "Inactive", updatedBy: user.userId, updatedAt: new Date() },
       { new: true }
-    );
+    ).lean();
+
+    revalidateDojosCache();
+
     return NextResponse.json({ success: true, message: "Student deleted successfully", student });
   } catch (error) {
     return NextResponse.json(

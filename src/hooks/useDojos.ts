@@ -12,6 +12,7 @@ import {
   createDojo,
   updateDojo,
 } from '@/queries/dojoQueries';
+import { type DojoDropdownOption } from '@/queries/studentQueries';
 
 // --- queries ---
 
@@ -72,12 +73,27 @@ export function useCreateDojo() {
     },
 
     onSuccess: (dojo) => {
+      const instructor =
+        dojo.instructors && dojo.instructors.length > 0
+          ? dojo.instructors.join(', ')
+          : dojo.instructor;
+
       qc.setQueryData(
         queryKeys.dojos.dropdown(),
-        (old: { _id: string; dojoId?: string; name: string; location: string }[] | undefined) => {
+        (old: DojoDropdownOption[] | undefined) => {
           if (!old) return old;
           if (old.some((d) => d._id === dojo._id)) return old;
-          return [{ _id: dojo._id, dojoId: dojo.dojoId, name: dojo.name, location: dojo.location }, ...old];
+          return [
+            {
+              _id: dojo._id,
+              dojoId: dojo.dojoId,
+              name: dojo.name,
+              location: dojo.location,
+              instructor,
+              instructors: dojo.instructors,
+            },
+            ...old,
+          ];
         }
       );
     },

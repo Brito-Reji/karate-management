@@ -117,9 +117,18 @@ export async function fetchRecentTests(page = 1, limit = 10): Promise<RecentTest
   };
 }
 
+export type DojoDropdownOption = {
+  _id: string;
+  dojoId?: string;
+  name: string;
+  location: string;
+  instructor?: string;
+  instructors?: string[];
+};
+
 // unpaginated dojo list for dropdowns
-export async function fetchAllDojos(): Promise<{ _id: string; dojoId: string; name: string; location: string }[]> {
-  const res = await fetch('/api/admin/dojos?limit=100');
+export async function fetchAllDojos(): Promise<DojoDropdownOption[]> {
+  const res = await fetch('/api/admin/dojos/options');
   if (!res.ok) throw new Error('Failed to load dojos');
   const json = await res.json();
   if (!json.success) throw new Error(json.message);

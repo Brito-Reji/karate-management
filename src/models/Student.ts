@@ -42,6 +42,12 @@ const studentSchema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+studentSchema.index({ dojoId: 1, status: 1 });
+studentSchema.index({ createdAt: -1 });
+studentSchema.index({ createdBy: 1, createdAt: -1 });
+studentSchema.index({ belt: 1 });
+studentSchema.index({ name: 1 });
+
 const Student =
   (mongoose.models.Student as Model<StudentDocument> | undefined) ||
   mongoose.model<StudentDocument>("Student", studentSchema);
