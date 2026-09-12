@@ -7,6 +7,7 @@ import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
 import { useQuery } from '@tanstack/react-query';
 import { fetchStudents } from '@/queries/studentQueries';
+import AddStudentModal from '@/components/AddStudentModal';
 
 function SkeletonRows() {
   return (
@@ -75,6 +76,7 @@ function TestsContent() {
 
   const [searchInput, setSearchInput] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState<{
     beltName: string;
     awardedDate: string;
@@ -147,10 +149,10 @@ function TestsContent() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // get dojo name
+  // get dojo place address
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
-    return d ? d.name : '—';
+    return d ? d.location || d.name || '—' : '—';
   };
 
   // belts above current
@@ -340,11 +342,34 @@ function TestsContent() {
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-xs text-zinc-600 text-center font-mono">No students found.</div>
+              <div className="p-4 text-center space-y-3">
+                <p className="text-xs text-zinc-600 font-mono">No students found.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 h-9 px-4 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98]"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
+                  </svg>
+                  Add Student
+                </button>
+              </div>
             )}
           </div>
         )}
       </div>
+
+      <AddStudentModal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        initialName={searchInput}
+        dojos={dojos}
+        onCreated={(student) => {
+          setIsAddModalOpen(false);
+          handleSelectStudent(student);
+        }}
+      />
 
       {/* selected student + promote form */}
       {selectedStudent && (

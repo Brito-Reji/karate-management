@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import RowIndexBadge from '@/components/RowIndexBadge';
+import { updateStaffRole } from '@/queries/staffQueries';
+import { meQuery } from '@/queries/authQueries';
 
 type StaffUser = {
   _id: string;
@@ -25,12 +28,14 @@ function SkeletonRows() {
 
 export default function StaffPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -74,6 +79,30 @@ export default function StaffPage() {
     setIsModalOpen(true);
   };
 
+  const handleRoleChange = async (userId: string, role: StaffUser['role']) => {
+    const current = users.find((u) => u._id === userId);
+    if (!current || current.role === role) return;
+
+    setUpdatingId(userId);
+    setError('');
+    try {
+      const { user: updated, selfUpdated } = await updateStaffRole(userId, role);
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, role: updated.role } : u))
+      );
+      if (selfUpdated) {
+        await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
+        if (updated.role !== 'admin') {
+          router.replace('/admin/dojos');
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update role');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.password) {
@@ -110,7 +139,7 @@ export default function StaffPage() {
         <div>
           <h1 className="text-xl font-light tracking-tight text-zinc-100">Staff</h1>
           <p className="text-xs text-zinc-500 mt-1">
-            Manage admin and instructor accounts for the portal.
+            Manage existing staff accounts and change their admin or instructor role.
           </p>
         </div>
         <button
@@ -124,12 +153,14 @@ export default function StaffPage() {
         </button>
       </div>
 
-      {loading ? (
-        <SkeletonRows />
-      ) : error ? (
+      {error && (
         <div className="text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-4 py-3">
           {error}
         </div>
+      )}
+
+      {loading ? (
+        <SkeletonRows />
       ) : (
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
           {users.length > 0 ? (
@@ -163,16 +194,33 @@ export default function StaffPage() {
                       </div>
                     </div>
                   </div>
-                  {user.createdAt && (
-                    <span className="text-[11px] text-zinc-600 font-mono shrink-0">
-                      Added{' '}
-                      {new Date(user.createdAt).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-3 shrink-0 sm:self-center">
+                    <label className="sr-only" htmlFor={`role-${user._id}`}>
+                      Change role for {user.name}
+                    </label>
+                    <select
+                      id={`role-${user._id}`}
+                      value={user.role}
+                      disabled={updatingId === user._id}
+                      onChange={(e) =>
+                        handleRoleChange(user._id, e.target.value as StaffUser['role'])
+                      }
+                      className="h-8 px-2 rounded-lg bg-zinc-900/70 border border-zinc-800 text-[11px] text-zinc-200 capitalize focus:outline-none focus:border-zinc-500 disabled:opacity-50"
+                    >
+                      <option value="instructor">Instructor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    {user.createdAt && (
+                      <span className="text-[11px] text-zinc-600 font-mono hidden sm:inline">
+                        Added{' '}
+                        {new Date(user.createdAt).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

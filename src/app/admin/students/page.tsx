@@ -4,15 +4,14 @@ import React, { useState, useEffect, useCallback, Suspense, useRef, useMemo } fr
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useInfiniteStudents, useCreateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
+import { useInfiniteStudents, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import { useStaffUsers } from '@/hooks/useStaffUsers';
 import { meQuery } from '@/queries/authQueries';
 import useDebounce from '@/hooks/useDebounce';
 import { BELTS } from '@/lib/constants';
-import SearchableSelect from '@/components/SearchableSelect';
-import DojoSelect from '@/components/DojoSelect';
 import RowIndexBadge from '@/components/RowIndexBadge';
+import AddStudentModal from '@/components/AddStudentModal';
 
 function SkeletonRows() {
   return (
@@ -64,15 +63,6 @@ function StudentsContent() {
 
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    dojoId: '',
-    belt: 'White',
-    phoneNumber: '',
-    gender: '',
-    dob: '',
-  });
-  const [formError, setFormError] = useState('');
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const debouncedSearch = useDebounce(inputValue, 300);
@@ -105,7 +95,6 @@ function StudentsContent() {
   );
   const totalStudents = listData?.pages[0]?.total;
 
-  const createStudent = useCreateStudent();
   const deleteStudent = useDeleteStudent();
   const activateStudent = useActivateStudent();
 
@@ -140,11 +129,27 @@ function StudentsContent() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // get dojo name from id
+  // get dojo name from id (student list rows)
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
     return d ? d.name : '—';
   };
+
+  const dojoFilterOptions = useMemo(() => {
+    const locationCounts = new Map<string, number>();
+    for (const dojo of dojos) {
+      const place = dojo.location || dojo.name || '';
+      locationCounts.set(place, (locationCounts.get(place) ?? 0) + 1);
+    }
+    return dojos.map((dojo) => {
+      const place = dojo.location || dojo.name || '—';
+      const label =
+        (locationCounts.get(place) ?? 0) > 1 && dojo.dojoId
+          ? `${place} (${dojo.dojoId})`
+          : place;
+      return { value: dojo._id, label };
+    });
+  }, [dojos]);
 
   const staffNameById = useMemo(
     () => new Map(staffUsers.map((u) => [u._id, u.name])),
@@ -168,53 +173,7 @@ function StudentsContent() {
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [dojos]);
 
-  const openCreateModal = () => {
-    setFormData({ name: '', dojoId: '', belt: 'White', phoneNumber: '', gender: '', dob: '' });
-    setFormError('');
-    setIsModalOpen(true);
-  };
-
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.name) return;
-    setFormError('');
-
-    const payload = {
-      name: formData.name,
-      belt: formData.belt,
-      dojoId: formData.dojoId || undefined,
-      phoneNumber: formData.phoneNumber.trim() || undefined,
-      gender: (formData.gender as "Male" | "Female" | "Other" | undefined) || undefined,
-      dob: formData.dob || undefined,
-    };
-
-    createStudent.mutate(payload, {
-      onSuccess: () => setIsModalOpen(false),
-      onError: (err) => setFormError(err.message),
-    });
-  };
-
-  const isSubmitting = createStudent.isPending;
-
-  const dojoOptions = dojos.map((dojo) => {
-    const instructor =
-      dojo.instructors && dojo.instructors.length > 0
-        ? dojo.instructors.join(', ')
-        : dojo.instructor;
-    const base = `${dojo.name} — ${dojo.location}`;
-    const label = instructor ? `${base} · ${instructor}` : base;
-
-    return {
-      value: dojo._id,
-      label,
-    };
-  });
-
-  const beltOptions = BELTS.map((b) => ({
-    value: b.name,
-    label: b.name,
-    dotColor: b.color,
-  }));
+  const openCreateModal = () => setIsModalOpen(true);
 
   return (
     <div className="h-[calc(100dvh-5rem)] sm:h-[calc(100dvh-7rem)] lg:h-[calc(100dvh-8rem)] min-h-0 flex flex-col gap-6 animate-fadeIn">
@@ -276,9 +235,9 @@ function StudentsContent() {
               className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
             >
               <option value="" className="bg-zinc-950">All Dojos</option>
-              {dojos.map((dojo) => (
-                <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
-                  {dojo.name}
+              {dojoFilterOptions.map((option) => (
+                <option key={option.value} value={option.value} className="bg-zinc-950">
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -522,118 +481,11 @@ function StudentsContent() {
         )}
       </div>
 
-      {/* add student modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn overflow-y-auto sm:overflow-visible">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-
-          <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <div className="mb-6">
-              <h2 className="text-base font-medium text-zinc-100 tracking-tight">
-                Add New Student
-              </h2>
-              <p className="text-xs text-zinc-500 mt-1">
-                Enroll a new student into the academy.
-              </p>
-            </div>
-
-            {formError && (
-              <div className="mb-4 text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-3 py-2">
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleFormSubmit} className="space-y-5">
-              {/* name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Arun Kumar"
-                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
-                />
-              </div>
-
-              {/* dojo selection */}
-              <DojoSelect
-                label="Dojo Branch"
-                value={formData.dojoId}
-                onChange={(val) => setFormData({ ...formData, dojoId: val })}
-                options={dojoOptions}
-                placeholder="Select a dojo..."
-              />
-
-              {/* belt selection */}
-              <SearchableSelect
-                label="Starting Belt"
-                value={formData.belt}
-                onChange={(val) => setFormData({ ...formData, belt: val })}
-                options={beltOptions}
-                placeholder="Select a belt..."
-              />
-
-              {/* phone */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Phone Number (optional)</label>
-                <input
-                  type="tel"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                  placeholder="e.g., 9876543210"
-                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
-                />
-              </div>
-
-              {/* gender + dob */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Gender</label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-                  >
-                    <option value="" className="bg-zinc-900">Select...</option>
-                    <option value="Male" className="bg-zinc-900">Male</option>
-                    <option value="Female" className="bg-zinc-900">Female</option>
-                    <option value="Other" className="bg-zinc-900">Other</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* actions */}
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="h-10 px-4 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="h-10 px-5 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Saving…' : 'Enroll Student'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddStudentModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        dojos={dojos}
+      />
     </div>
   );
 }

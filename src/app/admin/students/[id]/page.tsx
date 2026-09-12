@@ -246,7 +246,7 @@ function StudentDetailContent() {
 
   const dojoOptions = dojos.map((dojo) => {
     const instructors = formatDojoInstructors(dojo);
-    const base = `${dojo.name} — ${dojo.location}`;
+    const base = dojo.location || dojo.name;
     const label = instructors !== '—' ? `${base} · ${instructors}` : base;
     return { value: dojo._id, label };
   });
@@ -317,13 +317,7 @@ function StudentDetailContent() {
             <BeltDot belt={student.belt || 'White'} />
             <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
             <span className="text-zinc-700">•</span>
-            <span>{linkedDojo?.name || '—'}</span>
-            {linkedDojo?.location && (
-              <>
-                <span className="text-zinc-700">•</span>
-                <span>{linkedDojo.location}</span>
-              </>
-            )}
+            <span>{linkedDojo?.location || linkedDojo?.name || '—'}</span>
           </div>
           <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
             {student.phoneNumber && (
