@@ -31,6 +31,41 @@ function BeltDot({ belt }: { belt: string }) {
   );
 }
 
+function BeltProgressionLabel({
+  fromBelt,
+  beltName,
+  status,
+}: {
+  fromBelt?: string;
+  beltName: string;
+  status?: 'Pass' | 'Fail';
+}) {
+  const from = fromBelt || 'White';
+  const isFail = status === 'Fail';
+
+  if (isFail) {
+    return (
+      <span className="inline-flex items-center flex-wrap gap-x-1.5 gap-y-1 text-sm font-medium text-zinc-200">
+        <BeltDot belt={from} />
+        <span>{from}</span>
+        <span className="text-zinc-600 font-normal">· attempted</span>
+        <BeltDot belt={beltName} />
+        <span>{beltName}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center flex-wrap gap-x-1.5 gap-y-1 text-sm font-medium text-zinc-200">
+      <BeltDot belt={from} />
+      <span>{from}</span>
+      <span className="text-zinc-600 font-normal">→</span>
+      <BeltDot belt={beltName} />
+      <span>{beltName}</span>
+    </span>
+  );
+}
+
 function TestsContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,11 +138,13 @@ function TestsContent() {
   const [editingEntry, setEditingEntry] = useState<null | {
     _id: string;
     beltName: string;
+    fromBelt: string;
     awardedDate: string;
     examiner: string;
     notes: string;
     status: 'Pass' | 'Fail';
   }>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // get dojo name
@@ -181,11 +218,16 @@ function TestsContent() {
     );
   };
 
+  const resolveStudentId = (studentId?: string) =>
+    selectedStudent?._id || editingStudentId || studentId || '';
+
   // open edit form for a history entry
-  const handleEditEntry = (entry) => {
+  const handleEditEntry = (entry, studentId?: string) => {
+    setEditingStudentId(studentId || selectedStudent?._id || null);
     setEditingEntry({
       _id: entry._id,
       beltName: entry.beltName,
+      fromBelt: entry.fromBelt || 'White',
       awardedDate: new Date(entry.awardedDate).toISOString().split('T')[0],
       examiner: entry.examiner || '',
       notes: entry.notes || '',
@@ -193,32 +235,51 @@ function TestsContent() {
     });
   };
 
+  const closeEditModal = () => {
+    setEditingEntry(null);
+    setEditingStudentId(null);
+  };
+
   // save edited entry
   const handleSaveEdit = () => {
-    if (!editingEntry || !selectedStudent) return;
+    const studentId = resolveStudentId();
+    if (!editingEntry || !studentId) return;
     updateEntry.mutate(
       {
-        studentId: selectedStudent._id,
+        studentId,
         entryId: editingEntry._id,
         beltName: editingEntry.beltName,
+        fromBelt: editingEntry.fromBelt,
         awardedDate: editingEntry.awardedDate,
         examiner: editingEntry.examiner,
         notes: editingEntry.notes,
         status: editingEntry.status,
       },
       {
-        onSuccess: () => setEditingEntry(null),
+        onSuccess: (data) => {
+          closeEditModal();
+          if (selectedStudent && data?.belt) {
+            setSelectedStudent({ ...selectedStudent, belt: data.belt });
+          }
+        },
       }
     );
   };
 
   // delete a history entry
-  const handleDeleteEntry = (entryId: string) => {
-    if (!selectedStudent) return;
+  const handleDeleteEntry = (entryId: string, studentId?: string) => {
+    const resolvedId = resolveStudentId(studentId);
+    if (!resolvedId) return;
     deleteEntry.mutate(
-      { studentId: selectedStudent._id, entryId },
+      { studentId: resolvedId, entryId },
       {
-        onSuccess: () => setDeleteConfirmId(null),
+        onSuccess: (data) => {
+          setDeleteConfirmId(null);
+          setEditingStudentId(null);
+          if (selectedStudent && data?.belt) {
+            setSelectedStudent({ ...selectedStudent, belt: data.belt });
+          }
+        },
       }
     );
   };
@@ -404,6 +465,29 @@ function TestsContent() {
                         <BeltDot belt={formData.beltName} />
                       </div>
                     </div>
+                    {formData.beltName && (
+                      <p className="text-xs text-zinc-500 flex items-center flex-wrap gap-x-1.5 gap-y-1 pt-1">
+                        {formData.status === 'Pass' ? (
+                          <>
+                            <span className="text-zinc-600">Promote</span>
+                            <BeltProgressionLabel
+                              fromBelt={selectedStudent.belt || 'White'}
+                              beltName={formData.beltName}
+                              status="Pass"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-zinc-600">Failed attempt</span>
+                            <BeltProgressionLabel
+                              fromBelt={selectedStudent.belt || 'White'}
+                              beltName={formData.beltName}
+                              status="Fail"
+                            />
+                          </>
+                        )}
+                      </p>
+                    )}
                   </div>
 
                   {/* date + examiner */}
@@ -491,10 +575,11 @@ function TestsContent() {
                       >
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                            <BeltDot belt={entry.beltName} />
-                            <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">
-                              {entry.beltName}
-                            </h3>
+                            <BeltProgressionLabel
+                              fromBelt={entry.fromBelt}
+                              beltName={entry.beltName}
+                              status={entry.status}
+                            />
                             {entry.status === 'Fail' ? (
                               <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-rose-950/20 border-rose-500/20 text-rose-400">
                                 Failed
@@ -582,14 +667,17 @@ function TestsContent() {
       {/* edit history entry modal */}
       {editingEntry && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto sm:overflow-visible">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingEntry(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEditModal} />
           <div className="relative w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)] sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center space-x-2">
-                <BeltDot belt={editingEntry.beltName} />
-                <h2 className="text-sm font-medium text-zinc-100">Edit — {editingEntry.beltName}</h2>
+              <div className="flex items-center space-x-2 min-w-0">
+                <BeltProgressionLabel
+                  fromBelt={editingEntry.fromBelt}
+                  beltName={editingEntry.beltName}
+                  status={editingEntry.status}
+                />
               </div>
-              <button onClick={() => setEditingEntry(null)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+              <button onClick={closeEditModal} className="text-zinc-600 hover:text-zinc-300 transition-colors shrink-0">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -628,23 +716,46 @@ function TestsContent() {
                 </div>
               </div>
 
-              {/* belt */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400 tracking-wide">Belt</label>
-                <div className="relative">
-                  <select
-                    value={editingEntry.beltName}
-                    onChange={(e) => setEditingEntry({ ...editingEntry, beltName: e.target.value })}
-                    className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
-                  >
-                    {BELTS.map((b) => (
-                      <option key={b.name} value={b.name} className="bg-zinc-900">
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                    <BeltDot belt={editingEntry.beltName} />
+              {/* from / to belts */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">From Belt</label>
+                  <div className="relative">
+                    <select
+                      value={editingEntry.fromBelt}
+                      onChange={(e) => setEditingEntry({ ...editingEntry, fromBelt: e.target.value })}
+                      className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+                    >
+                      {BELTS.map((b) => (
+                        <option key={b.name} value={b.name} className="bg-zinc-900">
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <BeltDot belt={editingEntry.fromBelt} />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">
+                    {editingEntry.status === 'Pass' ? 'To Belt' : 'Tested Belt'}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editingEntry.beltName}
+                      onChange={(e) => setEditingEntry({ ...editingEntry, beltName: e.target.value })}
+                      className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+                    >
+                      {BELTS.map((b) => (
+                        <option key={b.name} value={b.name} className="bg-zinc-900">
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <BeltDot belt={editingEntry.beltName} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -687,7 +798,7 @@ function TestsContent() {
               {/* actions */}
               <div className="flex items-center justify-end space-x-3 pt-1">
                 <button
-                  onClick={() => setEditingEntry(null)}
+                  onClick={closeEditModal}
                   className="h-9 px-4 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
                 >
                   Cancel
@@ -742,10 +853,28 @@ function TestsContent() {
                       >
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                            <BeltDot belt={entry.beltName} />
                             <h3 className="text-sm font-medium text-zinc-200 break-words">
-                              {entry.beltName}
+                              {entry.student?.name || 'Unknown student'}
                             </h3>
+                            {entry.student?.studentId && (
+                              <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                                {entry.student.studentId}
+                              </span>
+                            )}
+                          </div>
+
+                          {entry.student?.dojoId && (
+                            <p className="text-xs text-zinc-500 break-words">
+                              {dojoName(entry.student.dojoId)}
+                            </p>
+                          )}
+
+                          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                            <BeltProgressionLabel
+                              fromBelt={entry.fromBelt}
+                              beltName={entry.beltName}
+                              status={entry.status}
+                            />
                             <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-zinc-900 border-zinc-800 text-zinc-400">
                               {testType}
                             </span>
@@ -785,7 +914,43 @@ function TestsContent() {
                           {entry.notes && (
                             <p className="text-xs text-zinc-600 mt-0.5 line-clamp-2">{entry.notes}</p>
                           )}
+
+                          {deleteConfirmId === entry._id && (
+                            <div className="mt-2 flex items-center space-x-2 bg-rose-950/20 border border-rose-500/20 rounded-lg px-3 py-2">
+                              <span className="text-[11px] text-rose-400 flex-1">Delete this entry?</span>
+                              <button
+                                onClick={() => handleDeleteEntry(entry._id, entry.student?._id)}
+                                disabled={deleteEntry.isPending}
+                                className="text-[11px] font-medium text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                              >
+                                {deleteEntry.isPending ? 'Deleting…' : 'Yes'}
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="text-[11px] font-medium text-zinc-500 hover:text-zinc-300"
+                              >
+                                No
+                              </button>
+                            </div>
+                          )}
                         </div>
+
+                        {entry.student?._id && (
+                          <div className="flex items-center justify-between sm:justify-end space-x-2 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
+                            <button
+                              onClick={() => handleEditEntry(entry, entry.student._id)}
+                              className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-7 px-3 rounded-md"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmId(entry._id)}
+                              className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-7 px-3 rounded-md"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

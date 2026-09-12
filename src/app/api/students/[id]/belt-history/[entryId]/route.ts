@@ -1,6 +1,7 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
 import { BELTS } from "@/lib/constants";
+import { recomputeStudentBelt } from "@/lib/beltHistory";
 import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
@@ -11,8 +12,8 @@ export async function PUT(request, { params }) {
 
   try {
     await connectDB();
-    const { entryId } = await params;
-    const { beltName, awardedDate, examiner, notes, status } = await request.json();
+    const { id, entryId } = await params;
+    const { beltName, fromBelt, awardedDate, examiner, notes, status } = await request.json();
 
     const updateFields: Record<string, unknown> = { awardedDate, examiner, notes, status };
 
@@ -20,6 +21,10 @@ export async function PUT(request, { params }) {
       updateFields.beltName = beltName;
       const bInfo = BELTS.find((b) => b.name === beltName);
       if (bInfo) updateFields.rank = bInfo.rank;
+    }
+
+    if (fromBelt) {
+      updateFields.fromBelt = fromBelt;
     }
 
     const entry = await BeltProgression.findByIdAndUpdate(
@@ -35,7 +40,9 @@ export async function PUT(request, { params }) {
       );
     }
 
-    return NextResponse.json({ success: true, entry });
+    const belt = await recomputeStudentBelt(id);
+
+    return NextResponse.json({ success: true, entry, belt });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Failed to update entry", error: error.message },
@@ -51,7 +58,7 @@ export async function DELETE(request, { params }) {
 
   try {
     await connectDB();
-    const { entryId } = await params;
+    const { id, entryId } = await params;
 
     const entry = await BeltProgression.findByIdAndDelete(entryId);
 
@@ -62,7 +69,9 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    const belt = await recomputeStudentBelt(id);
+
+    return NextResponse.json({ success: true, belt });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Failed to delete entry", error: error.message },

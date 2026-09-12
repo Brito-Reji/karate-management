@@ -1,6 +1,7 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
 import "@/models/Student";
+import { enrichEntriesWithFromBelt } from "@/lib/beltHistory";
 import { requireAdmin } from "@/lib/requireAuth";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -39,7 +40,9 @@ export async function GET(request: NextRequest) {
         .lean(),
     ]);
 
-    const entries = history.map((entry) => {
+    const enriched = await enrichEntriesWithFromBelt(history);
+
+    const entries = enriched.map((entry) => {
       const populated = entry.studentId;
       const student =
         populated && typeof populated === "object" && "name" in populated
@@ -49,6 +52,7 @@ export async function GET(request: NextRequest) {
       return {
         _id: entry._id,
         beltName: entry.beltName,
+        fromBelt: entry.fromBelt,
         rank: entry.rank,
         awardedDate: entry.awardedDate,
         examiner: entry.examiner,

@@ -23,8 +23,13 @@ export async function GET(request) {
     const dojoId = searchParams.get("dojoId")?.trim() || "";
     const belt = searchParams.get("belt")?.trim() || "";
     const status = searchParams.get("status")?.trim() || "";
+    const createdBy = searchParams.get("createdBy")?.trim() || "";
 
     const filter: Record<string, unknown> = { ...getStudentScopeFilter(user) };
+
+    if (user.role === "admin" && createdBy) {
+      filter.createdBy = createdBy;
+    }
 
     if (search) {
       const prefix = prefixRegex(search);
