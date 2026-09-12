@@ -91,6 +91,11 @@ export default function StaffPage() {
         prev.map((u) => (u._id === userId ? { ...u, role: updated.role } : u))
       );
       if (selfUpdated) {
+        queryClient.setQueryData(meQuery.queryKey, {
+          userId: updated._id,
+          name: updated.name,
+          role: updated.role,
+        });
         await queryClient.invalidateQueries({ queryKey: meQuery.queryKey });
         if (updated.role !== 'admin') {
           router.replace('/admin/dojos');

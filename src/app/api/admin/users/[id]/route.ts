@@ -1,7 +1,7 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { requireAdmin } from "@/lib/requireAuth";
-import { SignJWT } from "jose";
+import { setAuthCookie } from "@/lib/authCookie";
 import { type NextRequest, NextResponse } from "next/server";
 
 type StaffRole = "admin" | "instructor";
@@ -79,22 +79,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     });
 
     if (selfUpdated) {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-      const token = await new SignJWT({
+      await setAuthCookie(response, {
         userId: target._id.toString(),
         name: target.name,
         role: target.role,
-      })
-        .setProtectedHeader({ alg: "HS256" })
-        .setExpirationTime("7d")
-        .sign(secret);
-
-      response.cookies.set("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
       });
     }
 
