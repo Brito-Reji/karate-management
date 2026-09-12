@@ -17,7 +17,19 @@ export const queryKeys = {
 
   tests: {
     all:    ()                         => ['tests'],
-    recent: (page = 1, limit = 10)    => ['tests', 'recent', { page, limit }],
+    recent: (
+      page = 1,
+      limit = 50,
+      filters: { date?: string; status?: string } = {}
+    ) => ['tests', 'recent', { page, limit, ...filters }],
+  },
+
+  examDay: {
+    all: (
+      page = 1,
+      limit = 50,
+      filters: { date?: string; status?: string } = {}
+    ) => ['examDay', { page, limit, ...filters }],
   },
 
   staff: {

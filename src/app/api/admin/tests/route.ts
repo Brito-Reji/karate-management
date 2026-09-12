@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       history: entries,
       total,
       page,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / Math.max(limit, 1)),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load recent tests";
