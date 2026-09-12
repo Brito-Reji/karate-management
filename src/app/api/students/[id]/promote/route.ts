@@ -51,6 +51,7 @@ export async function POST(request, { params }) {
     const progression = await BeltProgression.create({
       studentId: student._id,
       beltName,
+      fromBelt: student.belt,
       rank: newBelt.rank,
       awardedDate: awardedDate || new Date(),
       examiner: examiner || user.name,

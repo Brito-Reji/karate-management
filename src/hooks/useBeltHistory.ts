@@ -46,6 +46,8 @@ export function useUpdateBeltHistory() {
     mutationFn: updateBeltHistoryEntry,
 
     onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.students.detail(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
     },

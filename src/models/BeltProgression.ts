@@ -3,6 +3,7 @@ import mongoose, { type Model } from "mongoose";
 export type BeltProgressionDocument = {
   studentId: mongoose.Types.ObjectId;
   beltName: string;
+  fromBelt?: string;
   rank: number;
   awardedDate: Date;
   examiner?: string;
@@ -20,6 +21,7 @@ const beltProgressionSchema = new mongoose.Schema(
       index: true,
     },
     beltName: { type: String, required: true },
+    fromBelt: { type: String },
     rank: { type: Number, required: true },
     awardedDate: { type: Date, required: true, default: Date.now },
     examiner: { type: String },

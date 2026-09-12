@@ -42,6 +42,7 @@ export type BeltHistoryEntry = {
   _id: string;
   studentId: string;
   beltName: string;
+  fromBelt?: string;
   rank: number;
   awardedDate: string;
   examiner?: string;
@@ -53,6 +54,7 @@ export type BeltHistoryEntry = {
 export type RecentTestEntry = {
   _id: string;
   beltName: string;
+  fromBelt?: string;
   rank: number;
   awardedDate: string;
   examiner?: string;
@@ -230,6 +232,7 @@ export async function updateBeltHistoryEntry({
   studentId,
   entryId,
   beltName,
+  fromBelt,
   awardedDate,
   examiner,
   notes,
@@ -238,15 +241,16 @@ export async function updateBeltHistoryEntry({
   studentId: string;
   entryId: string;
   beltName?: string;
+  fromBelt?: string;
   awardedDate?: string;
   examiner?: string;
   notes?: string;
   status?: 'Pass' | 'Fail';
-}): Promise<{ entry: BeltHistoryEntry }> {
+}): Promise<{ entry: BeltHistoryEntry; belt?: string }> {
   const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
+    body: JSON.stringify({ beltName, fromBelt, awardedDate, examiner, notes, status }),
   });
   if (!res.ok) {
     const json = await res.json();
@@ -264,7 +268,7 @@ export async function deleteBeltHistoryEntry({
 }: {
   studentId: string;
   entryId: string;
-}): Promise<void> {
+}): Promise<{ belt?: string }> {
   const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
     method: 'DELETE',
   });
@@ -272,5 +276,8 @@ export async function deleteBeltHistoryEntry({
     const json = await res.json();
     throw new Error(json.message || 'Failed to delete entry');
   }
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message);
+  return json;
 }
 

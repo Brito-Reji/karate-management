@@ -1,5 +1,6 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
+import { enrichStudentHistoryWithFromBelt } from "@/lib/beltHistory";
 import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
@@ -16,7 +17,9 @@ export async function GET(request, { params }) {
       .sort({ awardedDate: -1, createdAt: -1 })
       .lean();
 
-    return NextResponse.json({ success: true, history });
+    const enriched = enrichStudentHistoryWithFromBelt(history);
+
+    return NextResponse.json({ success: true, history: enriched });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Failed to load belt history" },
