@@ -2,19 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import RowIndexBadge from '@/components/RowIndexBadge';
-import { updateStaffRole } from '@/queries/staffQueries';
+import { updateStaffBlocked, updateStaffRole, type StaffUser } from '@/queries/staffQueries';
 import { meQuery } from '@/queries/authQueries';
-
-type StaffUser = {
-  _id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  role: 'admin' | 'instructor';
-  createdAt?: string;
-};
 
 function SkeletonRows() {
   return (
@@ -29,6 +20,7 @@ function SkeletonRows() {
 export default function StaffPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery(meQuery);
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,6 +28,7 @@ export default function StaffPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [blockingId, setBlockingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -108,6 +101,31 @@ export default function StaffPage() {
     }
   };
 
+  const handleBlockToggle = async (userId: string, currentlyBlocked: boolean) => {
+    const target = users.find((u) => u._id === userId);
+    if (!target) return;
+
+    if (
+      !currentlyBlocked &&
+      !confirm(`Block ${target.name}? They will be signed out and unable to log in.`)
+    ) {
+      return;
+    }
+
+    setBlockingId(userId);
+    setError('');
+    try {
+      const { user: updated } = await updateStaffBlocked(userId, !currentlyBlocked);
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, isBlocked: updated.isBlocked } : u))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update block status');
+    } finally {
+      setBlockingId(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.password) {
@@ -144,7 +162,7 @@ export default function StaffPage() {
         <div>
           <h1 className="text-xl font-light tracking-tight text-zinc-100">Staff</h1>
           <p className="text-xs text-zinc-500 mt-1">
-            Manage existing staff accounts and change their admin or instructor role.
+            Manage staff accounts, roles, and block access when needed.
           </p>
         </div>
         <button
@@ -191,6 +209,11 @@ export default function StaffPage() {
                         >
                           {user.role}
                         </span>
+                        {user.isBlocked && (
+                          <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-red-950/20 border-red-500/20 text-red-400">
+                            Blocked
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
                         {user.email && <span className="break-all">{user.email}</span>}
@@ -199,14 +222,14 @@ export default function StaffPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 sm:self-center">
+                  <div className="flex items-center flex-wrap gap-2 sm:gap-3 shrink-0 sm:self-center">
                     <label className="sr-only" htmlFor={`role-${user._id}`}>
                       Change role for {user.name}
                     </label>
                     <select
                       id={`role-${user._id}`}
                       value={user.role}
-                      disabled={updatingId === user._id}
+                      disabled={updatingId === user._id || blockingId === user._id || user.isBlocked}
                       onChange={(e) =>
                         handleRoleChange(user._id, e.target.value as StaffUser['role'])
                       }
@@ -215,6 +238,25 @@ export default function StaffPage() {
                       <option value="instructor">Instructor</option>
                       <option value="admin">Admin</option>
                     </select>
+                    {user._id !== currentUser?.userId && (
+                      user.isBlocked ? (
+                        <button
+                          onClick={() => handleBlockToggle(user._id, true)}
+                          disabled={blockingId === user._id}
+                          className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-8 px-3 rounded-md disabled:opacity-40"
+                        >
+                          Unblock
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleBlockToggle(user._id, false)}
+                          disabled={blockingId === user._id}
+                          className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-8 px-3 rounded-md disabled:opacity-40"
+                        >
+                          Block
+                        </button>
+                      )
+                    )}
                     {user.createdAt && (
                       <span className="text-[11px] text-zinc-600 font-mono hidden sm:inline">
                         Added{' '}

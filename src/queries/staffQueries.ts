@@ -6,6 +6,7 @@ export type StaffUser = {
   email?: string;
   phone?: string;
   role: 'admin' | 'instructor';
+  isBlocked?: boolean;
   createdAt?: string;
 };
 
@@ -31,6 +32,22 @@ export async function updateStaffRole(
     throw new Error(json.message || 'Failed to update role');
   }
   return { user: json.user, selfUpdated: json.selfUpdated };
+}
+
+export async function updateStaffBlocked(
+  id: string,
+  isBlocked: boolean
+): Promise<{ user: StaffUser }> {
+  const res = await fetch(`/api/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isBlocked }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update block status');
+  }
+  return { user: json.user };
 }
 
 export const staffListQuery = () => ({

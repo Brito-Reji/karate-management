@@ -30,10 +30,28 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const { id } = await params;
     const body = await request.json();
     const role = body?.role;
+    const isBlocked = body?.isBlocked;
 
-    if (!isStaffRole(role)) {
+    const hasRole = role !== undefined;
+    const hasBlocked = isBlocked !== undefined;
+
+    if (!hasRole && !hasBlocked) {
+      return NextResponse.json(
+        { success: false, message: "Nothing to update" },
+        { status: 400 }
+      );
+    }
+
+    if (hasRole && !isStaffRole(role)) {
       return NextResponse.json(
         { success: false, message: "Role must be admin or instructor" },
+        { status: 400 }
+      );
+    }
+
+    if (hasBlocked && typeof isBlocked !== "boolean") {
+      return NextResponse.json(
+        { success: false, message: "isBlocked must be a boolean" },
         { status: 400 }
       );
     }
@@ -48,26 +66,61 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     if (!isStaffRole(target.role)) {
       return NextResponse.json(
-        { success: false, message: "Only staff roles can be changed here" },
+        { success: false, message: "Only staff accounts can be updated here" },
         { status: 400 }
       );
     }
 
-    if (target.role === role) {
-      return NextResponse.json({ success: true, user: toSafeUser(target) });
-    }
-
-    if (target.role === "admin" && role === "instructor") {
-      const adminCount = await User.countDocuments({ role: "admin" });
-      if (adminCount <= 1) {
+    if (hasBlocked && isBlocked) {
+      if (actor.userId === target._id.toString()) {
         return NextResponse.json(
-          { success: false, message: "Cannot demote the last admin" },
+          { success: false, message: "You cannot block yourself" },
           { status: 400 }
         );
       }
+
+      if (target.role === "admin") {
+        const activeAdminCount = await User.countDocuments({
+          role: "admin",
+          isBlocked: { $ne: true },
+        });
+        if (activeAdminCount <= 1) {
+          return NextResponse.json(
+            { success: false, message: "Cannot block the last active admin" },
+            { status: 400 }
+          );
+        }
+      }
     }
 
-    target.role = role;
+    let changed = false;
+
+    if (hasRole && target.role !== role) {
+      if (target.role === "admin" && role === "instructor") {
+        const adminCount = await User.countDocuments({ role: "admin" });
+        if (adminCount <= 1) {
+          return NextResponse.json(
+            { success: false, message: "Cannot demote the last admin" },
+            { status: 400 }
+          );
+        }
+      }
+      target.role = role;
+      changed = true;
+    }
+
+    if (hasBlocked && target.isBlocked !== isBlocked) {
+      target.isBlocked = isBlocked;
+      if (isBlocked) {
+        target.refreshToken = undefined;
+      }
+      changed = true;
+    }
+
+    if (!changed) {
+      return NextResponse.json({ success: true, user: toSafeUser(target) });
+    }
+
     target.updatedAt = new Date();
     await target.save();
 
@@ -78,7 +131,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       selfUpdated,
     });
 
-    if (selfUpdated) {
+    if (selfUpdated && hasRole) {
       await setAuthCookie(response, {
         userId: target._id.toString(),
         name: target.name,
@@ -88,9 +141,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update role";
+    const message = err instanceof Error ? err.message : "Failed to update staff user";
     return NextResponse.json(
-      { success: false, message: "Failed to update role", error: message },
+      { success: false, message: "Failed to update staff user", error: message },
       { status: 500 }
     );
   }

@@ -49,3 +49,13 @@ export async function setAuthCookie(
     maxAge: AUTH_COOKIE_MAX_AGE,
   });
 }
+
+export function clearAuthCookie(response: NextResponse): void {
+  response.cookies.set(AUTH_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+  });
+}
