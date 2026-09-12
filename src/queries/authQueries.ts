@@ -16,7 +16,7 @@ export async function fetchMe(): Promise<AuthUser> {
 export const meQuery = {
   queryKey: ['auth', 'me'] as const,
   queryFn: fetchMe,
-  staleTime: 1000 * 60 * 30,
+  staleTime: 1000 * 60,
   gcTime: 1000 * 60 * 60,
-  refetchOnWindowFocus: false as const,
+  refetchOnWindowFocus: true as const,
 };

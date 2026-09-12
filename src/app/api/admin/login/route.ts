@@ -1,7 +1,7 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { hashPassword, verifyPassword, isHashedPassword } from "@/lib/password";
-import { SignJWT } from "jose";
+import { setAuthCookie } from "@/lib/authCookie";
 import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -25,28 +25,15 @@ export async function POST(req: NextRequest) {
     await user.save();
   }
 
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-
-  const token = await new SignJWT({
-    userId: user._id.toString(),
-    name: user.name,
-    role: user.role,
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("7d")
-    .sign(secret);
-
   const response = NextResponse.json({
     success: true,
     user: { name: user.name, role: user.role },
   });
 
-  response.cookies.set("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+  await setAuthCookie(response, {
+    userId: user._id.toString(),
+    name: user.name,
+    role: user.role,
   });
 
   return response;

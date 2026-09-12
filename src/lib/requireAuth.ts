@@ -1,4 +1,6 @@
-import { jwtVerify } from "jose";
+import connectDB from "@/lib/db";
+import User from "@/models/User";
+import { verifyAuthToken } from "@/lib/authCookie";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -13,17 +15,21 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   const token = cookieStore.get("token")?.value;
   if (!token) return null;
 
-  try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret);
-    return {
-      userId: payload.userId as string,
-      name: payload.name as string,
-      role: payload.role as AuthUser["role"],
-    };
-  } catch {
-    return null;
-  }
+  const payload = await verifyAuthToken(token);
+  if (!payload) return null;
+
+  await connectDB();
+  const user = await User.findById(payload.userId)
+    .select("name role isBlocked")
+    .lean();
+
+  if (!user || user.isBlocked) return null;
+
+  return {
+    userId: payload.userId,
+    name: user.name,
+    role: user.role as AuthUser["role"],
+  };
 }
 
 const STAFF_ROLES: AuthUser["role"][] = ["admin", "instructor"];
