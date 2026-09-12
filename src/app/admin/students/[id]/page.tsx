@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
+import { useStudent, useUpdateStudent, useDeleteStudent, useActivateStudent, usePermanentlyDeleteStudent } from '@/hooks/useStudents';
 import { useAllDojos, useBeltHistory } from '@/hooks/useBeltHistory';
 import { meQuery } from '@/queries/authQueries';
 import { BELTS } from '@/lib/constants';
@@ -151,6 +151,7 @@ function StudentDetailContent() {
   const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
   const activateStudent = useActivateStudent();
+  const permanentlyDeleteStudent = usePermanentlyDeleteStudent();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -242,6 +243,20 @@ function StudentDetailContent() {
   const handleActivate = () => {
     if (!student || !confirm('Activate this student?')) return;
     activateStudent.mutate(student._id);
+  };
+
+  const handlePermanentDelete = () => {
+    if (
+      !student ||
+      !confirm(
+        'Permanently delete this student? Remaining student IDs will be reassigned in order. This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+    permanentlyDeleteStudent.mutate(student._id, {
+      onSuccess: () => router.push('/admin/students'),
+    });
   };
 
   const dojoOptions = dojos.map((dojo) => {
@@ -366,6 +381,15 @@ function StudentDetailContent() {
               className="text-xs font-medium text-zinc-500 hover:text-emerald-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-emerald-950/10 hover:border-emerald-500/20 h-9 px-4 rounded-lg disabled:opacity-50"
             >
               Activate
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handlePermanentDelete}
+              disabled={permanentlyDeleteStudent.isPending}
+              className="text-xs font-medium text-red-400/80 hover:text-red-300 transition-colors bg-red-950/10 border border-red-500/20 hover:bg-red-950/20 h-9 px-4 rounded-lg disabled:opacity-50"
+            >
+              {permanentlyDeleteStudent.isPending ? 'Deleting…' : 'Delete'}
             </button>
           )}
         </div>

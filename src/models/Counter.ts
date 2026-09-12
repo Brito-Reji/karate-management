@@ -14,6 +14,8 @@ const Counter =
   (mongoose.models.Counter as Model<CounterDocument> | undefined) ||
   mongoose.model<CounterDocument>("Counter", counterSchema);
 
+export const STUDENT_ID_SEQ_START = 1000;
+
 // atomic increment — safe for concurrent calls
 export async function getNextSequence(name: string): Promise<number> {
   const counter = await Counter.findOneAndUpdate(
@@ -22,6 +24,14 @@ export async function getNextSequence(name: string): Promise<number> {
     { upsert: true, returnDocument: "after" }
   );
   return counter.seq;
+}
+
+export async function setSequence(name: string, seq: number): Promise<void> {
+  await Counter.findOneAndUpdate(
+    { name },
+    { $set: { seq } },
+    { upsert: true }
+  );
 }
 
 export default Counter;
