@@ -17,6 +17,22 @@ export async function fetchStaffUsers(): Promise<StaffUser[]> {
   return json.users;
 }
 
+export async function updateStaffRole(
+  id: string,
+  role: StaffUser['role']
+): Promise<{ user: StaffUser; selfUpdated?: boolean }> {
+  const res = await fetch(`/api/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update role');
+  }
+  return { user: json.user, selfUpdated: json.selfUpdated };
+}
+
 export const staffListQuery = () => ({
   queryKey: queryKeys.staff.list(),
   queryFn: fetchStaffUsers,
