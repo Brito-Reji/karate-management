@@ -742,10 +742,27 @@ function TestsContent() {
                       >
                         <div className="space-y-1.5 min-w-0">
                           <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                            <BeltDot belt={entry.beltName} />
                             <h3 className="text-sm font-medium text-zinc-200 break-words">
-                              {entry.beltName}
+                              {entry.student?.name || 'Unknown student'}
                             </h3>
+                            {entry.student?.studentId && (
+                              <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                                {entry.student.studentId}
+                              </span>
+                            )}
+                          </div>
+
+                          {entry.student?.dojoId && (
+                            <p className="text-xs text-zinc-500 break-words">
+                              {dojoName(entry.student.dojoId)}
+                            </p>
+                          )}
+
+                          <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                            <BeltDot belt={entry.beltName} />
+                            <span className="text-sm text-zinc-300 break-words">
+                              {entry.beltName}
+                            </span>
                             <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border bg-zinc-900 border-zinc-800 text-zinc-400">
                               {testType}
                             </span>
