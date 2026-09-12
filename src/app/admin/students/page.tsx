@@ -129,10 +129,10 @@ function StudentsContent() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // get dojo name from id
+  // get dojo place address from id
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
-    return d ? d.name : '—';
+    return d ? d.location || d.name || '—' : '—';
   };
 
   const staffNameById = useMemo(
@@ -221,7 +221,7 @@ function StudentsContent() {
               <option value="" className="bg-zinc-950">All Dojos</option>
               {dojos.map((dojo) => (
                 <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
-                  {dojo.name}
+                  {dojo.location || dojo.name}
                 </option>
               ))}
             </select>

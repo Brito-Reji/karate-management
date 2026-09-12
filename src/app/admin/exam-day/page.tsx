@@ -102,7 +102,7 @@ function ExamDayContent() {
 
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
-    return d ? d.name : '—';
+    return d ? d.location || d.name || '—' : '—';
   };
 
   const instructorOptions = useMemo(() => {
@@ -279,7 +279,7 @@ function ExamDayContent() {
             </option>
             {dojos.map((dojo) => (
               <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
-                {dojo.name}
+                {dojo.location || dojo.name}
               </option>
             ))}
           </select>

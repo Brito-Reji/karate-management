@@ -133,7 +133,7 @@ export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
   await connectDB();
   const dojos = await Dojo.find({})
     .select("_id dojoId name location instructor instructors")
-    .sort({ name: 1 })
+    .sort({ location: 1 })
     .lean();
 
   return dojos.map((dojo) => {

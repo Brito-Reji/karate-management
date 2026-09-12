@@ -149,10 +149,10 @@ function TestsContent() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // get dojo name
+  // get dojo place address
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
-    return d ? d.name : '—';
+    return d ? d.location || d.name || '—' : '—';
   };
 
   // belts above current

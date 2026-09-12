@@ -15,7 +15,7 @@ function buildDojoOptions(dojos: DojoDropdownOption[]): DojoSelectOption[] {
       dojo.instructors && dojo.instructors.length > 0
         ? dojo.instructors.join(', ')
         : dojo.instructor;
-    const base = `${dojo.name} — ${dojo.location}`;
+    const base = dojo.location || dojo.name;
     const label = instructor ? `${base} · ${instructor}` : base;
     return { value: dojo._id, label };
   });
