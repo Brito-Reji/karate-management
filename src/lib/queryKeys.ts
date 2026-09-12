@@ -19,4 +19,9 @@ export const queryKeys = {
     all:    ()                         => ['tests'],
     recent: (page = 1, limit = 10)    => ['tests', 'recent', { page, limit }],
   },
+
+  staff: {
+    all: () => ['staff'],
+    list: () => ['staff', 'list'],
+  },
 };
