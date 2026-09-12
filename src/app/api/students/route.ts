@@ -1,32 +1,11 @@
 import connectDB from "@/lib/db";
 import Student from "@/models/Student";
-import Dojo from "@/models/Dojo";
 import { getNextSequence } from "@/models/Counter";
 import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
 import { prefixRegex } from "@/lib/mongoSearch";
 import { revalidateDojosCache } from "@/lib/cacheTags";
-import { normalizeDojo } from "@/lib/dojoQueriesServer";
+import { resolveStudentDojoFilter } from "@/lib/dojoQueriesServer";
 import { NextResponse } from "next/server";
-
-const NO_MATCH_DOJO_ID = "__no_match__";
-
-async function getDojoIdsForInstructor(instructor: string) {
-  const dojos = await Dojo.find({})
-    .select("_id dojoId instructor instructors")
-    .lean();
-
-  const ids = new Set<string>();
-
-  for (const dojo of dojos) {
-    const normalized = normalizeDojo(dojo as Record<string, unknown>);
-    if (!normalized.instructors.includes(instructor)) continue;
-
-    ids.add(normalized._id);
-    if (normalized.dojoId) ids.add(normalized.dojoId);
-  }
-
-  return [...ids];
-}
 
 const LIST_SELECT =
   "studentId name dojoId dob gender phoneNumber belt status createdAt createdBy";
@@ -64,20 +43,9 @@ export async function GET(request) {
       ];
     }
 
-    if (instructor) {
-      const instructorDojoIds = await getDojoIdsForInstructor(instructor);
-
-      if (dojoId) {
-        filter.dojoId = instructorDojoIds.includes(dojoId)
-          ? dojoId
-          : { $in: [NO_MATCH_DOJO_ID] };
-      } else {
-        filter.dojoId = instructorDojoIds.length
-          ? { $in: instructorDojoIds }
-          : { $in: [NO_MATCH_DOJO_ID] };
-      }
-    } else if (dojoId) {
-      filter.dojoId = dojoId;
+    const dojoFilter = await resolveStudentDojoFilter(dojoId, instructor);
+    if (dojoFilter) {
+      Object.assign(filter, dojoFilter);
     }
 
     if (belt) filter.belt = belt;

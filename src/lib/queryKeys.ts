@@ -28,7 +28,7 @@ export const queryKeys = {
     all: (
       page = 1,
       limit = 50,
-      filters: { date?: string; status?: string } = {}
+      filters: { date?: string; status?: string; dojoId?: string; instructor?: string } = {}
     ) => ['examDay', { page, limit, ...filters }],
   },
 

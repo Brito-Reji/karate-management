@@ -1,7 +1,8 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
-import "@/models/Student";
+import Student from "@/models/Student";
 import { enrichEntriesWithFromBelt } from "@/lib/beltHistory";
+import { resolveStudentDojoFilter } from "@/lib/dojoQueriesServer";
 import {
   EXAM_DAY_TIMEZONE,
   getTodayDateString,
@@ -83,6 +84,8 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
     const dateParam = searchParams.get("date")?.trim() || getTodayDateString();
     const statusParam = searchParams.get("status");
+    const dojoId = searchParams.get("dojoId")?.trim() || "";
+    const instructor = searchParams.get("instructor")?.trim() || "";
 
     const range = parseExamDayRange(dateParam);
     if (!range) {
@@ -96,21 +99,38 @@ export async function GET(request: NextRequest) {
       awardedDate: { $gte: range.start, $lt: range.end },
     };
     const statusFilter = buildStatusFilter(statusParam);
-    const listFilter = { ...dateFilter, ...statusFilter };
+
+    const dojoStudentFilter = await resolveStudentDojoFilter(dojoId, instructor);
+    let studentScopeFilter: Record<string, unknown> = {};
+    if (dojoStudentFilter) {
+      const matchingStudents = await Student.find(dojoStudentFilter).select("_id").lean();
+      studentScopeFilter = {
+        studentId: { $in: matchingStudents.map((student) => student._id) },
+      };
+    }
+
+    const listFilter = { ...dateFilter, ...statusFilter, ...studentScopeFilter };
 
     const passFilter: Record<string, unknown> = {
       ...dateFilter,
+      ...studentScopeFilter,
       $or: [
         { status: "Pass" },
         { status: { $exists: false } },
         { status: null },
       ],
     };
-    const failFilter: Record<string, unknown> = { ...dateFilter, status: "Fail" };
+    const failFilter: Record<string, unknown> = {
+      ...dateFilter,
+      ...studentScopeFilter,
+      status: "Fail",
+    };
+
+    const dayTotalFilter = { ...dateFilter, ...studentScopeFilter };
 
     const [dayTotal, pass, fail, listTotal, history, examDateRows] =
       await Promise.all([
-        BeltProgression.countDocuments(dateFilter),
+        BeltProgression.countDocuments(dayTotalFilter),
         BeltProgression.countDocuments(passFilter),
         BeltProgression.countDocuments(failFilter),
         BeltProgression.countDocuments(listFilter),

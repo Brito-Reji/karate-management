@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useCallback, useRef } from 'react';
+import React, { Suspense, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAllDojos, useExamDay } from '@/hooks/useBeltHistory';
@@ -76,6 +76,8 @@ function ExamDayContent() {
   const currentPage = Number(searchParams.get('page')) || 1;
   const selectedDate = searchParams.get('date') || getTodayDateString();
   const selectedStatus = (searchParams.get('status') as 'Pass' | 'Fail' | null) || '';
+  const selectedDojoId = searchParams.get('dojoId') || '';
+  const selectedInstructor = searchParams.get('instructor') || '';
   const EXAM_DAY_LIMIT = 50;
   const todayDate = getTodayDateString();
   const isToday = selectedDate === todayDate;
@@ -89,6 +91,8 @@ function ExamDayContent() {
   } = useExamDay(currentPage, EXAM_DAY_LIMIT, {
     date: selectedDate,
     status: selectedStatus,
+    dojoId: selectedDojoId,
+    ...(selectedInstructor ? { instructor: selectedInstructor } : {}),
   });
 
   const entries = examDayData?.history ?? [];
@@ -100,6 +104,18 @@ function ExamDayContent() {
     const d = dojos.find((dj) => dj._id === dojoId);
     return d ? d.name : '—';
   };
+
+  const instructorOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const dojo of dojos) {
+      if (dojo.instructors && dojo.instructors.length > 0) {
+        dojo.instructors.forEach((name) => names.add(name));
+      } else if (dojo.instructor) {
+        names.add(dojo.instructor);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [dojos]);
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -246,6 +262,72 @@ function ExamDayContent() {
               })}
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3">
+        <div className="relative w-full sm:w-48 min-w-0">
+          <select
+            value={selectedDojoId}
+            onChange={(e) =>
+              setParams({ dojoId: e.target.value || null, page: null })
+            }
+            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+          >
+            <option value="" className="bg-zinc-950">
+              All Dojos
+            </option>
+            {dojos.map((dojo) => (
+              <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
+                {dojo.name}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="relative w-full sm:w-48 min-w-0">
+          <select
+            value={selectedInstructor}
+            onChange={(e) =>
+              setParams({ instructor: e.target.value || null, page: null })
+            }
+            className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+          >
+            <option value="" className="bg-zinc-950">
+              All Instructors
+            </option>
+            {instructorOptions.map((name) => (
+              <option key={name} value={name} className="bg-zinc-950">
+                {name}
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+        </div>
+
+        {(selectedDojoId || selectedInstructor) && (
+          <button
+            type="button"
+            onClick={() =>
+              setParams({
+                dojoId: null,
+                instructor: null,
+                page: null,
+              })
+            }
+            className="col-span-2 sm:col-span-1 h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+          >
+            Reset
+          </button>
         )}
       </div>
 

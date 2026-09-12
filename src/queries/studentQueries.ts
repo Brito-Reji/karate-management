@@ -121,6 +121,8 @@ export type RecentTestsResponse = {
 export type ExamDayFilters = {
   date?: string;
   status?: 'Pass' | 'Fail' | '';
+  dojoId?: string;
+  instructor?: string;
 };
 
 export type ExamDayResponse = {
@@ -144,6 +146,8 @@ export async function fetchExamDay(
   });
   if (filters.date) params.set('date', filters.date);
   if (filters.status) params.set('status', filters.status);
+  if (filters.dojoId) params.set('dojoId', filters.dojoId);
+  if (filters.instructor) params.set('instructor', filters.instructor);
 
   const res = await fetch(`/api/admin/exam-day?${params}`);
   if (!res.ok) throw new Error('Failed to load exam day dashboard');
