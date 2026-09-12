@@ -12,6 +12,7 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  permanentlyDeleteStudent,
   fetchStudents,
 } from '@/queries/studentQueries';
 
@@ -188,6 +189,63 @@ export function useDeleteStudent() {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
       qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
+    },
+  });
+}
+
+export function usePermanentlyDeleteStudent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: permanentlyDeleteStudent,
+
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: queryKeys.students.all() });
+
+      const prevList = qc.getQueriesData({ queryKey: queryKeys.students.all() });
+
+      qc.setQueriesData({ queryKey: queryKeys.students.all() }, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages?: StudentListResponse[]; students?: Student[] };
+
+        if (Array.isArray(data.pages)) {
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              students: page.students.filter((s) => s._id !== id),
+              total: typeof page.total === 'number' ? Math.max(0, page.total - 1) : page.total,
+            })),
+          };
+        }
+
+        if (Array.isArray(data.students)) {
+          return {
+            ...data,
+            students: data.students.filter((s) => s._id !== id),
+            total:
+              typeof (data as StudentListResponse).total === 'number'
+                ? Math.max(0, ((data as StudentListResponse).total ?? 1) - 1)
+                : (data as StudentListResponse).total,
+          };
+        }
+
+        return old;
+      });
+
+      return { prevList };
+    },
+
+    onError: (_err, _id, ctx) => {
+      ctx?.prevList?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+
+    onSettled: (_data, _err, id) => {
+      qc.invalidateQueries({ queryKey: queryKeys.students.all() });
+      qc.removeQueries({ queryKey: queryKeys.students.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dojos.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
+      qc.invalidateQueries({ queryKey: ['examDay'] });
     },
   });
 }

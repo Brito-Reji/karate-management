@@ -281,6 +281,12 @@ export async function deleteStudent(id: string): Promise<Student> {
   return json.student;
 }
 
+export async function permanentlyDeleteStudent(id: string): Promise<void> {
+  const res = await fetch(`/api/students/${id}?permanent=1`, { method: 'DELETE' });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete student');
+}
+
 export async function promoteStudent({
   id,
   beltName,

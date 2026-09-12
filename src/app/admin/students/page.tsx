@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense, useRef, useMemo } fr
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useInfiniteStudents, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
+import { useInfiniteStudents, useDeleteStudent, useActivateStudent, usePermanentlyDeleteStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import { useStaffUsers } from '@/hooks/useStaffUsers';
 import { meQuery } from '@/queries/authQueries';
@@ -97,6 +97,7 @@ function StudentsContent() {
 
   const deleteStudent = useDeleteStudent();
   const activateStudent = useActivateStudent();
+  const permanentlyDeleteStudent = usePermanentlyDeleteStudent();
 
   const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -448,6 +449,23 @@ function StudentsContent() {
                               >
                                 <span className="sm:hidden">On</span>
                                 <span className="hidden sm:inline">Activate</span>
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      'Permanently delete this student? Remaining student IDs will be reassigned in order. This cannot be undone.'
+                                    )
+                                  ) {
+                                    permanentlyDeleteStudent.mutate(student._id);
+                                  }
+                                }}
+                                disabled={student._id === '__optimistic__' || permanentlyDeleteStudent.isPending}
+                                className="text-xs font-medium text-zinc-500 hover:text-red-400 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-red-950/10 hover:border-red-500/20 h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
+                              >
+                                Delete
                               </button>
                             )}
                           </div>

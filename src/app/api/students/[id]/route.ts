@@ -1,7 +1,9 @@
 import connectDB from "@/lib/db";
 import Student from "@/models/Student";
+import BeltProgression from "@/models/BeltProgression";
 import { requireStaff, canAccessStudent, isDuplicateKeyError } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
+import { resequenceStudentIds } from "@/lib/resequenceStudentIds";
 import { NextResponse } from "next/server";
 
 export async function GET(request, { params }) {
@@ -128,6 +130,27 @@ export async function DELETE(request, { params }) {
       );
     }
 
+    const permanent = new URL(request.url).searchParams.get("permanent") === "1";
+
+    if (permanent) {
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Admin access required to permanently delete a student" },
+          { status: 403 }
+        );
+      }
+
+      await BeltProgression.deleteMany({ studentId: id });
+      await Student.findByIdAndDelete(id);
+      await resequenceStudentIds();
+      revalidateDojosCache();
+
+      return NextResponse.json({
+        success: true,
+        message: "Student deleted. Remaining student IDs were reassigned.",
+      });
+    }
+
     const student = await Student.findByIdAndUpdate(
       id,
       { status: "Inactive", updatedBy: user.userId, updatedAt: new Date() },
@@ -136,7 +159,7 @@ export async function DELETE(request, { params }) {
 
     revalidateDojosCache();
 
-    return NextResponse.json({ success: true, message: "Student deleted successfully", student });
+    return NextResponse.json({ success: true, message: "Student deactivated successfully", student });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: "Failed to delete student", error: error.message },
