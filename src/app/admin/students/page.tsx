@@ -129,11 +129,27 @@ function StudentsContent() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // get dojo place address from id
+  // get dojo name from id (student list rows)
   const dojoName = (dojoId: string) => {
     const d = dojos.find((dj) => dj._id === dojoId);
-    return d ? d.location || d.name || '—' : '—';
+    return d ? d.name : '—';
   };
+
+  const dojoFilterOptions = useMemo(() => {
+    const locationCounts = new Map<string, number>();
+    for (const dojo of dojos) {
+      const place = dojo.location || dojo.name || '';
+      locationCounts.set(place, (locationCounts.get(place) ?? 0) + 1);
+    }
+    return dojos.map((dojo) => {
+      const place = dojo.location || dojo.name || '—';
+      const label =
+        (locationCounts.get(place) ?? 0) > 1 && dojo.dojoId
+          ? `${place} (${dojo.dojoId})`
+          : place;
+      return { value: dojo._id, label };
+    });
+  }, [dojos]);
 
   const staffNameById = useMemo(
     () => new Map(staffUsers.map((u) => [u._id, u.name])),
@@ -219,9 +235,9 @@ function StudentsContent() {
               className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
             >
               <option value="" className="bg-zinc-950">All Dojos</option>
-              {dojos.map((dojo) => (
-                <option key={dojo._id} value={dojo._id} className="bg-zinc-950">
-                  {dojo.location || dojo.name}
+              {dojoFilterOptions.map((option) => (
+                <option key={option.value} value={option.value} className="bg-zinc-950">
+                  {option.label}
                 </option>
               ))}
             </select>
