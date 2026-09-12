@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useInfiniteStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
+import { useInfiniteStudents, useCreateStudent, useDeleteStudent, useActivateStudent } from '@/hooks/useStudents';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import { useStaffUsers } from '@/hooks/useStaffUsers';
 import { meQuery } from '@/queries/authQueries';
@@ -54,6 +55,7 @@ function StudentsContent() {
   const searchQuery = searchParams.get('search') || '';
   const selectedBelt = searchParams.get('belt') || '';
   const selectedDojoId = searchParams.get('dojoId') || '';
+  const selectedInstructor = searchParams.get('instructor') || '';
   const selectedCreatedBy = searchParams.get('createdBy') || '';
 
   const { data: currentUser } = useQuery(meQuery);
@@ -62,7 +64,6 @@ function StudentsContent() {
 
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     dojoId: '',
@@ -88,6 +89,7 @@ function StudentsContent() {
   } = useInfiniteStudents(debouncedSearch, {
     belt: selectedBelt,
     dojoId: selectedDojoId,
+    ...(selectedInstructor ? { instructor: selectedInstructor } : {}),
     ...(isAdmin && selectedCreatedBy ? { createdBy: selectedCreatedBy } : {}),
   });
 
@@ -104,7 +106,6 @@ function StudentsContent() {
   const totalStudents = listData?.pages[0]?.total;
 
   const createStudent = useCreateStudent();
-  const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
   const activateStudent = useActivateStudent();
 
@@ -155,23 +156,20 @@ function StudentsContent() {
     return staffNameById.get(createdBy) || 'Unknown';
   };
 
-  const openCreateModal = () => {
-    setEditingStudent(null);
-    setFormData({ name: '', dojoId: '', belt: 'White', phoneNumber: '', gender: '', dob: '' });
-    setFormError('');
-    setIsModalOpen(true);
-  };
+  const instructorOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const dojo of dojos) {
+      if (dojo.instructors && dojo.instructors.length > 0) {
+        dojo.instructors.forEach((name) => names.add(name));
+      } else if (dojo.instructor) {
+        names.add(dojo.instructor);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [dojos]);
 
-  const openEditModal = (student) => {
-    setEditingStudent(student);
-    setFormData({
-      name: student.name || '',
-      dojoId: student.dojoId || '',
-      belt: student.belt || 'White',
-      phoneNumber: student.phoneNumber || '',
-      gender: student.gender || '',
-      dob: student.dob ? student.dob.split('T')[0] : '',
-    });
+  const openCreateModal = () => {
+    setFormData({ name: '', dojoId: '', belt: 'White', phoneNumber: '', gender: '', dob: '' });
     setFormError('');
     setIsModalOpen(true);
   };
@@ -190,23 +188,13 @@ function StudentsContent() {
       dob: formData.dob || undefined,
     };
 
-    if (editingStudent) {
-      updateStudent.mutate(
-        { id: editingStudent._id, ...payload } as any,
-        {
-          onSuccess: () => setIsModalOpen(false),
-          onError: (err) => setFormError(err.message),
-        }
-      );
-    } else {
-      createStudent.mutate(payload, {
-        onSuccess: () => setIsModalOpen(false),
-        onError: (err) => setFormError(err.message),
-      });
-    }
+    createStudent.mutate(payload, {
+      onSuccess: () => setIsModalOpen(false),
+      onError: (err) => setFormError(err.message),
+    });
   };
 
-  const isSubmitting = createStudent.isPending || updateStudent.isPending;
+  const isSubmitting = createStudent.isPending;
 
   const dojoOptions = dojos.map((dojo) => {
     const instructor =
@@ -322,6 +310,27 @@ function StudentsContent() {
             </div>
           </div>
 
+          {/* instructor filter (from dojo list) */}
+          <div className="relative w-full md:w-48 min-w-0">
+            <select
+              value={selectedInstructor}
+              onChange={(e) => setParams({ instructor: e.target.value || null })}
+              className="w-full h-10 px-3.5 pr-8 rounded-lg bg-white/[0.02] border border-white/[0.06] text-xs text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all appearance-none"
+            >
+              <option value="" className="bg-zinc-950">All Instructors</option>
+              {instructorOptions.map((name) => (
+                <option key={name} value={name} className="bg-zinc-950">
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-500">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+          </div>
+
           {/* added by filter (admin only) */}
           {isAdmin && (
             <div className="relative w-full md:w-48 min-w-0">
@@ -345,11 +354,17 @@ function StudentsContent() {
             </div>
           )}
 
-          {(inputValue || selectedDojoId || selectedBelt || selectedCreatedBy) && (
+          {(inputValue || selectedDojoId || selectedBelt || selectedInstructor || selectedCreatedBy) && (
             <button
               onClick={() => {
                 setInputValue('');
-                setParams({ search: null, dojoId: null, belt: null, createdBy: null });
+                setParams({
+                  search: null,
+                  dojoId: null,
+                  belt: null,
+                  instructor: null,
+                  createdBy: null,
+                });
               }}
               className="col-span-2 sm:col-span-1 h-10 px-4 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] active:scale-[0.98] text-xs text-zinc-400 hover:text-white transition-all flex items-center justify-center"
             >
@@ -382,37 +397,61 @@ function StudentsContent() {
                           student._id === '__optimistic__' ? 'opacity-50' : ''
                         }`}
                       >
-                        <div className="flex items-start gap-3 min-w-0">
-                          <RowIndexBadge index={index} />
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
-                              <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
-                              <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
-                                {student.studentId ?? '—'}
-                              </span>
-                            </div>
-                            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
-                              <BeltDot belt={student.belt || 'White'} />
-                              <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
-                              <span className="text-zinc-700">•</span>
-                              <span className="break-words">{dojoName(student.dojoId || '')}</span>
-                              {student.phoneNumber && (
-                                <>
-                                  <span className="text-zinc-700">•</span>
-                                  <span className="font-mono">{student.phoneNumber}</span>
-                                </>
-                              )}
-                              {isAdmin && (
-                                <>
-                                  <span className="text-zinc-700">•</span>
-                                  <span>Added by {creatorName(student.createdBy)}</span>
-                                </>
-                              )}
+                        {student._id === '__optimistic__' ? (
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <RowIndexBadge index={index} />
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                                <h3 className="text-sm font-medium text-zinc-200 break-words">{student.name}</h3>
+                                <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                                  {student.studentId ?? '—'}
+                                </span>
+                              </div>
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                                <BeltDot belt={student.belt || 'White'} />
+                                <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          <Link
+                            href={`/admin/students/${student._id}`}
+                            className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer"
+                          >
+                            <RowIndexBadge index={index} />
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+                                <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors break-words">{student.name}</h3>
+                                <span className="text-[10px] font-mono text-zinc-600 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded shrink-0">
+                                  {student.studentId ?? '—'}
+                                </span>
+                              </div>
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
+                                <BeltDot belt={student.belt || 'White'} />
+                                <span className="text-zinc-400 font-medium">{student.belt || 'White'}</span>
+                                <span className="text-zinc-700">•</span>
+                                <span className="break-words">{dojoName(student.dojoId || '')}</span>
+                                {student.phoneNumber && (
+                                  <>
+                                    <span className="text-zinc-700">•</span>
+                                    <span className="font-mono">{student.phoneNumber}</span>
+                                  </>
+                                )}
+                                {isAdmin && (
+                                  <>
+                                    <span className="text-zinc-700">•</span>
+                                    <span>Added by {creatorName(student.createdBy)}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+                        )}
 
-                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0">
+                        <div
+                          className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 border-t border-white/[0.02] sm:border-t-0 pt-3 sm:pt-0 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full tracking-wide border ${
                             student.status === 'Active'
                               ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
@@ -423,7 +462,7 @@ function StudentsContent() {
 
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => openEditModal(student)}
+                              onClick={() => router.push(`/admin/students/${student._id}?edit=1`)}
                               disabled={student._id === '__optimistic__'}
                               className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 sm:h-7 px-3 rounded-md disabled:opacity-40"
                             >
@@ -483,7 +522,7 @@ function StudentsContent() {
         )}
       </div>
 
-      {/* add/edit modal */}
+      {/* add student modal */}
       {isModalOpen && (
         <div className="fixed inset-0 w-full h-full flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn overflow-y-auto sm:overflow-visible">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
@@ -491,10 +530,10 @@ function StudentsContent() {
           <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div className="mb-6">
               <h2 className="text-base font-medium text-zinc-100 tracking-tight">
-                {editingStudent ? `Edit Student: ${editingStudent.studentId}` : 'Add New Student'}
+                Add New Student
               </h2>
               <p className="text-xs text-zinc-500 mt-1">
-                {editingStudent ? 'Update student details.' : 'Enroll a new student into the academy.'}
+                Enroll a new student into the academy.
               </p>
             </div>
 
@@ -588,7 +627,7 @@ function StudentsContent() {
                   disabled={isSubmitting}
                   className="h-10 px-5 bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Saving…' : editingStudent ? 'Save Changes' : 'Enroll Student'}
+                  {isSubmitting ? 'Saving…' : 'Enroll Student'}
                 </button>
               </div>
             </form>

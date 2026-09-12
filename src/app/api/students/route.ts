@@ -4,6 +4,7 @@ import { getNextSequence } from "@/models/Counter";
 import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
 import { prefixRegex } from "@/lib/mongoSearch";
 import { revalidateDojosCache } from "@/lib/cacheTags";
+import { resolveStudentDojoFilter } from "@/lib/dojoQueriesServer";
 import { NextResponse } from "next/server";
 
 const LIST_SELECT =
@@ -21,6 +22,7 @@ export async function GET(request) {
     const limit = Math.min(Number(searchParams.get("limit")) || 10, 100);
     const search = searchParams.get("search")?.trim() || "";
     const dojoId = searchParams.get("dojoId")?.trim() || "";
+    const instructor = searchParams.get("instructor")?.trim() || "";
     const belt = searchParams.get("belt")?.trim() || "";
     const status = searchParams.get("status")?.trim() || "";
     const createdBy = searchParams.get("createdBy")?.trim() || "";
@@ -41,7 +43,11 @@ export async function GET(request) {
       ];
     }
 
-    if (dojoId) filter.dojoId = dojoId;
+    const dojoFilter = await resolveStudentDojoFilter(dojoId, instructor);
+    if (dojoFilter) {
+      Object.assign(filter, dojoFilter);
+    }
+
     if (belt) filter.belt = belt;
     if (status) filter.status = status;
 

@@ -4,8 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
   type BeltHistoryEntry,
+  type RecentTestsFilters,
+  type ExamDayFilters,
   beltHistoryQuery,
   recentTestsQuery,
+  examDayQuery,
   allDojosQuery,
   promoteStudent,
   updateBeltHistoryEntry,
@@ -16,8 +19,20 @@ export function useBeltHistory(studentId: string) {
   return useQuery(beltHistoryQuery(studentId));
 }
 
-export function useRecentTests(page = 1, limit = 10) {
-  return useQuery(recentTestsQuery(page, limit));
+export function useRecentTests(
+  page = 1,
+  limit = 50,
+  filters: RecentTestsFilters = {}
+) {
+  return useQuery(recentTestsQuery(page, limit, filters));
+}
+
+export function useExamDay(
+  page = 1,
+  limit = 50,
+  filters: ExamDayFilters = {}
+) {
+  return useQuery(examDayQuery(page, limit, filters));
 }
 
 export function useAllDojos() {
@@ -35,6 +50,7 @@ export function usePromoteStudent() {
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
+      qc.invalidateQueries({ queryKey: ['examDay'] });
     },
   });
 }
@@ -50,6 +66,7 @@ export function useUpdateBeltHistory() {
       qc.invalidateQueries({ queryKey: queryKeys.students.detail(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
+      qc.invalidateQueries({ queryKey: ['examDay'] });
     },
   });
 }
@@ -64,6 +81,7 @@ export function useDeleteBeltHistory() {
       qc.invalidateQueries({ queryKey: queryKeys.students.all() });
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
+      qc.invalidateQueries({ queryKey: ['examDay'] });
     },
   });
 }

@@ -33,6 +33,15 @@ export default function AdminDashboard() {
     ...(role === 'admin'
       ? [
           {
+            label: 'Exam Day',
+            desc: 'Dashboard of tests on a selected date with pass and fail totals.',
+            href: '/admin/exam-day',
+          },
+        ]
+      : []),
+    ...(role === 'admin'
+      ? [
+          {
             label: 'Staff',
             desc: 'Add admins and instructors who can manage the portal.',
             href: '/admin/staff',

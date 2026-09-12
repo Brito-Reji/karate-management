@@ -99,15 +99,84 @@ export async function fetchBeltHistory(id: string): Promise<BeltHistoryEntry[]> 
   return json.history;
 }
 
+export type RecentTestsFilters = {
+  date?: string;
+  status?: 'Pass' | 'Fail' | '';
+};
+
+export type RecentTestsStats = {
+  total: number;
+  pass: number;
+  fail: number;
+};
+
 export type RecentTestsResponse = {
   history: RecentTestEntry[];
   total: number;
   page: number;
   totalPages: number;
+  stats: RecentTestsStats;
 };
 
-export async function fetchRecentTests(page = 1, limit = 10): Promise<RecentTestsResponse> {
-  const res = await fetch(`/api/admin/tests?page=${page}&limit=${limit}`);
+export type ExamDayFilters = {
+  date?: string;
+  status?: 'Pass' | 'Fail' | '';
+  dojoId?: string;
+  instructor?: string;
+};
+
+export type ExamDayResponse = {
+  date: string;
+  history: RecentTestEntry[];
+  total: number;
+  page: number;
+  totalPages: number;
+  stats: RecentTestsStats;
+  examDates: string[];
+};
+
+export async function fetchExamDay(
+  page = 1,
+  limit = 50,
+  filters: ExamDayFilters = {}
+): Promise<ExamDayResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (filters.date) params.set('date', filters.date);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.dojoId) params.set('dojoId', filters.dojoId);
+  if (filters.instructor) params.set('instructor', filters.instructor);
+
+  const res = await fetch(`/api/admin/exam-day?${params}`);
+  if (!res.ok) throw new Error('Failed to load exam day dashboard');
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'Failed to load exam day dashboard');
+  return {
+    date: json.date,
+    history: json.history,
+    total: json.total,
+    page: json.page,
+    totalPages: json.totalPages,
+    stats: json.stats ?? { total: json.total ?? 0, pass: 0, fail: 0 },
+    examDates: json.examDates ?? [],
+  };
+}
+
+export async function fetchRecentTests(
+  page = 1,
+  limit = 50,
+  filters: RecentTestsFilters = {}
+): Promise<RecentTestsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (filters.date) params.set('date', filters.date);
+  if (filters.status) params.set('status', filters.status);
+
+  const res = await fetch(`/api/admin/tests?${params}`);
   if (!res.ok) throw new Error('Failed to load recent tests');
   const json = await res.json();
   if (!json.success) throw new Error(json.message || 'Failed to load recent tests');
@@ -116,6 +185,7 @@ export async function fetchRecentTests(page = 1, limit = 10): Promise<RecentTest
     total: json.total,
     page: json.page,
     totalPages: json.totalPages,
+    stats: json.stats ?? { total: json.total ?? 0, pass: 0, fail: 0 },
   };
 }
 
@@ -156,9 +226,22 @@ export const beltHistoryQuery = (id: string) => ({
   enabled:  !!id,
 });
 
-export const recentTestsQuery = (page = 1, limit = 10) => ({
-  queryKey: queryKeys.tests.recent(page, limit),
-  queryFn:  () => fetchRecentTests(page, limit),
+export const recentTestsQuery = (
+  page = 1,
+  limit = 50,
+  filters: RecentTestsFilters = {}
+) => ({
+  queryKey: queryKeys.tests.recent(page, limit, filters),
+  queryFn:  () => fetchRecentTests(page, limit, filters),
+});
+
+export const examDayQuery = (
+  page = 1,
+  limit = 50,
+  filters: ExamDayFilters = {}
+) => ({
+  queryKey: queryKeys.examDay.all(page, limit, filters),
+  queryFn:  () => fetchExamDay(page, limit, filters),
 });
 
 export const allDojosQuery = () => ({

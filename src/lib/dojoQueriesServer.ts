@@ -15,6 +15,8 @@ export type DojoListItem = {
   count?: number;
 };
 
+export const NO_MATCH_DOJO_ID = "__no_match__";
+
 export function normalizeDojo(dojo: Record<string, unknown>): DojoListItem {
   const instructors = Array.isArray(dojo.instructors) && dojo.instructors.length > 0
     ? (dojo.instructors as string[])
@@ -27,6 +29,52 @@ export function normalizeDojo(dojo: Record<string, unknown>): DojoListItem {
     _id: String(dojo._id),
     instructors,
   };
+}
+
+export async function getDojoIdsForInstructor(instructor: string): Promise<string[]> {
+  await connectDB();
+  const dojos = await Dojo.find({})
+    .select("_id dojoId instructor instructors")
+    .lean();
+
+  const ids = new Set<string>();
+
+  for (const dojo of dojos) {
+    const normalized = normalizeDojo(dojo as Record<string, unknown>);
+    if (!normalized.instructors.includes(instructor)) continue;
+
+    ids.add(normalized._id);
+    if (normalized.dojoId) ids.add(normalized.dojoId);
+  }
+
+  return [...ids];
+}
+
+export async function resolveStudentDojoFilter(
+  dojoId: string,
+  instructor: string
+): Promise<Record<string, unknown> | null> {
+  if (!dojoId && !instructor) return null;
+
+  if (instructor) {
+    const instructorDojoIds = await getDojoIdsForInstructor(instructor);
+
+    if (dojoId) {
+      return {
+        dojoId: instructorDojoIds.includes(dojoId)
+          ? dojoId
+          : { $in: [NO_MATCH_DOJO_ID] },
+      };
+    }
+
+    return {
+      dojoId: instructorDojoIds.length
+        ? { $in: instructorDojoIds }
+        : { $in: [NO_MATCH_DOJO_ID] },
+    };
+  }
+
+  return { dojoId };
 }
 
 export function dojoSearchFilter(search: string) {
