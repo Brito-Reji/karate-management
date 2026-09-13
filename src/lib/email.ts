@@ -1,26 +1,46 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+function getTransporter() {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    return null;
+  }
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  });
+}
 
 const FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || "Martins Karate <onboarding@resend.dev>";
+  process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@martinskarate.com";
 
 export async function sendInstructorOtpEmail(
   to: string,
   otp: string,
   name: string
 ): Promise<void> {
-  if (!resend) {
+  const transporter = getTransporter();
+
+  if (!transporter) {
     if (process.env.NODE_ENV === "development") {
       console.log(`[dev] Instructor OTP for ${to}: ${otp}`);
       return;
     }
-    throw new Error("Email service is not configured (RESEND_API_KEY missing)");
+    throw new Error(
+      "Email service is not configured (SMTP_HOST, SMTP_USER, SMTP_PASS missing)"
+    );
   }
 
-  const { error } = await resend.emails.send({
+  await transporter.sendMail({
     from: FROM_EMAIL,
     to,
     subject: "Verify your email — Martins Karate Academy",
@@ -40,8 +60,4 @@ export async function sendInstructorOtpEmail(
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(error.message || "Failed to send verification email");
-  }
 }
