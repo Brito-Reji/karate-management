@@ -70,6 +70,7 @@ export async function POST(request) {
       phone: phone || undefined,
       password: hashed,
       role,
+      approvalStatus: "approved",
     });
 
     const safe = user.toObject();

@@ -19,6 +19,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (user.role === "instructor" && user.emailVerified === false) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Please verify your email to complete registration. Check your inbox for the verification code.",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (user.approvalStatus === "pending") {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Your application is pending admin approval. Please check back later.",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (user.approvalStatus === "rejected") {
+    return NextResponse.json(
+      {
+        success: false,
+        error: user.rejectionReason
+          ? `Your application was not approved: ${user.rejectionReason}`
+          : "Your application was not approved",
+      },
+      { status: 403 }
+    );
+  }
+
   if (user.isBlocked) {
     return NextResponse.json(
       { success: false, error: "This account is blocked" },

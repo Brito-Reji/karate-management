@@ -62,6 +62,7 @@ export default function AdminLayout({ children }) {
     pathname.startsWith('/admin/students') ? 'Students' :
     pathname.startsWith('/admin/tests') ? 'Tests' :
     pathname.startsWith('/admin/exam-day') ? 'Exam Day' :
+    pathname.startsWith('/admin/applications') ? 'Applications' :
     pathname.startsWith('/admin/staff') ? 'Staff' :
     pathname.startsWith('/admin/dojos') ? 'Dojos' :
     'Dashboard';
@@ -74,6 +75,9 @@ export default function AdminLayout({ children }) {
       : []),
     ...(currentUser?.role === 'admin'
       ? [{ label: 'Exam Day', path: '/admin/exam-day', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }]
+      : []),
+    ...(currentUser?.role === 'admin'
+      ? [{ label: 'Applications', path: '/admin/applications', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }]
       : []),
     ...(currentUser?.role === 'admin'
       ? [{ label: 'Staff', path: '/admin/staff', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' }]

@@ -61,6 +61,9 @@ export async function proxy(request) {
     if (pathname.startsWith("/admin/staff") && role !== "admin") {
       return NextResponse.redirect(new URL("/admin/dojos", request.url));
     }
+    if (pathname.startsWith("/admin/applications") && role !== "admin") {
+      return NextResponse.redirect(new URL("/admin/dojos", request.url));
+    }
 
     return NextResponse.next();
   } catch {

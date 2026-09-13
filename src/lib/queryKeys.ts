@@ -36,4 +36,9 @@ export const queryKeys = {
     all: () => ['staff'],
     list: () => ['staff', 'list'],
   },
+
+  applications: {
+    all: () => ['applications'],
+    list: () => ['applications', 'list'],
+  },
 };
