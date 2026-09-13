@@ -2,9 +2,12 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalHref, usePortalPath } from '@/hooks/usePortalRouting';
 
 export default function AdminLogin() {
   const router = useRouter();
+  const dojosPath = usePortalPath('admin', '/dojos');
+  const instructorRegisterHref = usePortalHref('instructor', '/register');
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +34,7 @@ export default function AdminLogin() {
       const data = await res.json();
 
       if (data.success) {
-        router.push('/admin/dojos');
+        router.push(dojosPath);
       } else {
         setError(data.error || data.message || 'Invalid credentials');
       }
@@ -145,7 +148,7 @@ export default function AdminLogin() {
 
           <p className="text-center text-xs text-zinc-500 mt-6">
             New instructor?{' '}
-            <a href="/instructor/register" className="text-zinc-300 hover:text-white transition-colors">
+            <a href={instructorRegisterHref} className="text-zinc-300 hover:text-white transition-colors">
               Register here
             </a>
           </p>

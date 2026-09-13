@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { type NextResponse } from "next/server";
+import { getCookieDomain } from "@/lib/portalRouting";
 
 export const AUTH_COOKIE_NAME = "token";
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -41,21 +42,25 @@ export async function setAuthCookie(
   payload: AuthTokenPayload
 ): Promise<void> {
   const token = await signAuthToken(payload);
+  const cookieDomain = getCookieDomain();
   response.cookies.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: AUTH_COOKIE_MAX_AGE,
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
   });
 }
 
 export function clearAuthCookie(response: NextResponse): void {
+  const cookieDomain = getCookieDomain();
   response.cookies.set(AUTH_COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
   });
 }

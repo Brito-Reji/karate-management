@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PasswordInput from '@/components/PasswordInput';
+import { usePortalHref, usePortalPath } from '@/hooks/usePortalRouting';
 
 type DojoOption = {
   _id: string;
@@ -14,6 +15,8 @@ type DojoOption = {
 
 export default function InstructorRegisterPage() {
   const router = useRouter();
+  const verifyEmailPath = usePortalPath('instructor', '/register/verify-email');
+  const adminLoginHref = usePortalHref('admin', '/login');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -102,11 +105,11 @@ export default function InstructorRegisterPage() {
 
       if (data.success && data.requiresVerification) {
         router.push(
-          `/instructor/register/verify-email?email=${encodeURIComponent(data.email || formData.email)}`
+          `${verifyEmailPath}?email=${encodeURIComponent(data.email || formData.email)}`
         );
       } else if (data.success) {
         router.push(
-          `/instructor/register/verify-email?email=${encodeURIComponent(formData.email)}`
+          `${verifyEmailPath}?email=${encodeURIComponent(formData.email)}`
         );
       } else {
         setError(data.message || 'Registration failed');
@@ -329,7 +332,7 @@ export default function InstructorRegisterPage() {
 
           <p className="text-center text-xs text-zinc-500 mt-6">
             Already have an account?{' '}
-            <Link href="/admin/login" className="text-zinc-300 hover:text-white transition-colors">
+            <Link href={adminLoginHref} className="text-zinc-300 hover:text-white transition-colors">
               Sign in
             </Link>
           </p>
