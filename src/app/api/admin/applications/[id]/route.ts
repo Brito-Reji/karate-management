@@ -1,7 +1,9 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Dojo from "@/models/Dojo";
+import { revalidateDojosCache } from "@/lib/cacheTags";
 import { requireAdmin } from "@/lib/requireAuth";
+import mongoose from "mongoose";
 import { type NextRequest, NextResponse } from "next/server";
 
 type RouteContext = {
@@ -53,17 +55,25 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       target.approvedBy = admin.userId;
       target.rejectionReason = undefined;
 
-      const dojoIds = target.dojoIds || [];
-      if (dojoIds.length > 0) {
-        const dojos = await Dojo.find({ _id: { $in: dojoIds } });
+      const instructorName = target.name.trim();
+      const validDojoIds = (target.dojoIds || []).filter((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+      );
+
+      if (validDojoIds.length > 0 && instructorName) {
+        await Dojo.updateMany(
+          { _id: { $in: validDojoIds } },
+          { $addToSet: { instructors: instructorName } }
+        );
+
+        const dojos = await Dojo.find({ _id: { $in: validDojoIds } });
         for (const dojo of dojos) {
           const instructors = dojo.instructors || [];
-          if (!instructors.includes(target.name)) {
-            dojo.instructors = [...instructors, target.name];
-            dojo.instructor = dojo.instructors.join(", ");
-            await dojo.save();
-          }
+          dojo.instructor = instructors.join(", ");
+          await dojo.save();
         }
+
+        revalidateDojosCache();
       }
     } else {
       target.approvalStatus = "rejected";

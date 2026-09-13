@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import PasswordInput from '@/components/PasswordInput';
 
@@ -20,6 +20,7 @@ export default function InstructorRegisterPage() {
     confirmPassword: '',
   });
   const [selectedDojoIds, setSelectedDojoIds] = useState<string[]>([]);
+  const [dojoSearch, setDojoSearch] = useState('');
   const [dojos, setDojos] = useState<DojoOption[]>([]);
   const [loadingDojos, setLoadingDojos] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -41,6 +42,18 @@ export default function InstructorRegisterPage() {
     };
     loadDojos();
   }, []);
+
+  const filteredDojos = useMemo(() => {
+    const query = dojoSearch.trim().toLowerCase();
+    if (!query) return dojos;
+
+    return dojos.filter((dojo) => {
+      const haystack = [dojo.name, dojo.dojoId, dojo.location]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [dojos, dojoSearch]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -238,6 +251,33 @@ export default function InstructorRegisterPage() {
               </label>
               <p className="text-[11px] text-zinc-600">Select all dojos you belong to</p>
 
+              {!loadingDojos && dojos.length > 0 && (
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={dojoSearch}
+                    onChange={(e) => setDojoSearch(e.target.value)}
+                    disabled={loading}
+                    placeholder="Search by name, ID, or location..."
+                    className="w-full h-9 pl-9 pr-14 rounded-lg bg-zinc-900/50 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 transition-all"
+                  />
+                  {dojoSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDojoSearch('')}
+                      className="absolute inset-y-0 right-0 pr-3 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
               {loadingDojos ? (
                 <div className="space-y-2 animate-pulse">
                   {[...Array(3)].map((_, i) => (
@@ -248,9 +288,13 @@ export default function InstructorRegisterPage() {
                 <p className="text-xs text-zinc-500 py-3 text-center border border-zinc-800 rounded-lg">
                   No dojos available yet.
                 </p>
+              ) : filteredDojos.length === 0 ? (
+                <p className="text-xs text-zinc-500 py-3 text-center border border-zinc-800 rounded-lg">
+                  No dojos match your search.
+                </p>
               ) : (
                 <div className="max-h-48 overflow-y-auto space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/30 p-2">
-                  {dojos.map((dojo) => {
+                  {filteredDojos.map((dojo) => {
                     const isSelected = selectedDojoIds.includes(dojo._id);
                     return (
                       <button
