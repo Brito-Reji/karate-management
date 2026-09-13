@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
+import { portalHref } from '@/lib/portalRouting';
 
 export default function RootPage() {
-  redirect('/admin/login');
+  redirect(portalHref('admin', '/login'));
 }

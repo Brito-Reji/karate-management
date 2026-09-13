@@ -5,6 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { meQuery } from '@/queries/authQueries';
+import { matchesPortalPath } from '@/lib/portalRouting';
+import { usePortalHost } from '@/components/PortalHostProvider';
+import { usePortalPath } from '@/hooks/usePortalRouting';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -13,9 +16,17 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const signingOutRef = useRef(false);
+  const host = usePortalHost();
+  const loginPath = usePortalPath('admin', '/login');
+  const dojosPath = usePortalPath('admin', '/dojos');
+  const studentsPath = usePortalPath('admin', '/students');
+  const testsPath = usePortalPath('admin', '/tests');
+  const examDayPath = usePortalPath('admin', '/exam-day');
+  const applicationsPath = usePortalPath('admin', '/applications');
+  const staffPath = usePortalPath('admin', '/staff');
   const { data: currentUser, isError: meError } = useQuery({
     ...meQuery,
-    enabled: pathname !== '/admin/login',
+    enabled: !matchesPortalPath(pathname, 'admin', '/login', host),
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -27,7 +38,7 @@ export default function AdminLayout({ children }) {
 
   // redirect blocked or expired sessions to login (clear cookie to avoid proxy redirect loop)
   useEffect(() => {
-    if (pathname === '/admin/login' || !meError || signingOutRef.current) return;
+    if (matchesPortalPath(pathname, 'admin', '/login', host) || !meError || signingOutRef.current) return;
     signingOutRef.current = true;
 
     void (async () => {
@@ -35,10 +46,10 @@ export default function AdminLayout({ children }) {
         await fetch('/api/admin/logout', { method: 'POST' });
       } finally {
         queryClient.removeQueries({ queryKey: meQuery.queryKey });
-        router.replace('/admin/login');
+        router.replace(loginPath);
       }
     })();
-  }, [meError, pathname, queryClient, router]);
+  }, [meError, pathname, queryClient, router, loginPath, host]);
 
   // lock body scroll when drawer open
   useEffect(() => {
@@ -51,36 +62,36 @@ export default function AdminLayout({ children }) {
   const handleLogout = async () => {
     await fetch('/api/admin/logout', { method: 'POST' });
     queryClient.removeQueries({ queryKey: meQuery.queryKey });
-    router.push('/admin/login');
+    router.push(loginPath);
   };
 
-  if (pathname === '/admin/login') {
+  if (matchesPortalPath(pathname, 'admin', '/login', host)) {
     return <>{children}</>;
   }
 
   const pageTitle =
-    pathname.startsWith('/admin/students') ? 'Students' :
-    pathname.startsWith('/admin/tests') ? 'Tests' :
-    pathname.startsWith('/admin/exam-day') ? 'Exam Day' :
-    pathname.startsWith('/admin/applications') ? 'Applications' :
-    pathname.startsWith('/admin/staff') ? 'Staff' :
-    pathname.startsWith('/admin/dojos') ? 'Dojos' :
+    matchesPortalPath(pathname, 'admin', '/students', host) ? 'Students' :
+    matchesPortalPath(pathname, 'admin', '/tests', host) ? 'Tests' :
+    matchesPortalPath(pathname, 'admin', '/exam-day', host) ? 'Exam Day' :
+    matchesPortalPath(pathname, 'admin', '/applications', host) ? 'Applications' :
+    matchesPortalPath(pathname, 'admin', '/staff', host) ? 'Staff' :
+    matchesPortalPath(pathname, 'admin', '/dojos', host) ? 'Dojos' :
     'Dashboard';
 
   const navItems = [
-    { label: 'Dojos', path: '/admin/dojos', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-    { label: 'Students', path: '/admin/students', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+    { label: 'Dojos', path: dojosPath, icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+    { label: 'Students', path: studentsPath, icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     ...(currentUser?.role === 'admin'
-      ? [{ label: 'Tests', path: '/admin/tests', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }]
+      ? [{ label: 'Tests', path: testsPath, icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }]
       : []),
     ...(currentUser?.role === 'admin'
-      ? [{ label: 'Exam Day', path: '/admin/exam-day', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }]
+      ? [{ label: 'Exam Day', path: examDayPath, icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }]
       : []),
     ...(currentUser?.role === 'admin'
-      ? [{ label: 'Applications', path: '/admin/applications', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }]
+      ? [{ label: 'Applications', path: applicationsPath, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }]
       : []),
     ...(currentUser?.role === 'admin'
-      ? [{ label: 'Staff', path: '/admin/staff', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' }]
+      ? [{ label: 'Staff', path: staffPath, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' }]
       : []),
   ];
 

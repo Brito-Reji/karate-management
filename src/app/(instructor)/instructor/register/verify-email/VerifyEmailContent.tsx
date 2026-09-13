@@ -4,9 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getGmailInboxUrl } from '@/lib/emailLinks';
+import { usePortalHref, usePortalPath } from '@/hooks/usePortalRouting';
 
 export default function VerifyEmailContent() {
   const router = useRouter();
+  const registerPath = usePortalPath('instructor', '/register');
+  const adminLoginHref = usePortalHref('admin', '/login');
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim().toLowerCase() ?? '';
 
@@ -22,9 +25,9 @@ export default function VerifyEmailContent() {
 
   useEffect(() => {
     if (!email) {
-      router.replace('/instructor/register');
+      router.replace(registerPath);
     }
-  }, [email, router]);
+  }, [email, router, registerPath]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -154,7 +157,7 @@ export default function VerifyEmailContent() {
               You will be able to log in once your account is approved.
             </p>
             <Link
-              href="/admin/login"
+              href={adminLoginHref}
               className="inline-flex h-11 items-center justify-center px-6 bg-zinc-100 hover:bg-white text-zinc-950 text-sm font-medium rounded-lg transition-all"
             >
               Back to Login
@@ -271,7 +274,7 @@ export default function VerifyEmailContent() {
 
           <p className="text-center text-xs text-zinc-500 mt-6">
             Wrong email?{' '}
-            <Link href="/instructor/register" className="text-zinc-300 hover:text-white transition-colors">
+            <Link href={registerPath} className="text-zinc-300 hover:text-white transition-colors">
               Go back
             </Link>
           </p>

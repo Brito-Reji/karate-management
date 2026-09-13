@@ -1,7 +1,11 @@
-export default function AdminPortalGroupLayout({
+import { headers } from 'next/headers';
+import { PortalHostProvider } from '@/components/PortalHostProvider';
+
+export default async function AdminPortalGroupLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  const host = (await headers()).get('host') ?? '';
+  return <PortalHostProvider host={host}>{children}</PortalHostProvider>;
 }

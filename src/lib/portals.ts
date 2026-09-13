@@ -9,16 +9,19 @@
 export const PORTALS = {
   admin: {
     routeGroup: "(admin)",
+    subdomain: "admin",
     basePath: "/admin",
     apiPrefix: "/api/admin",
   },
   instructor: {
     routeGroup: "(instructor)",
+    subdomain: "instructor",
     basePath: "/instructor",
     apiPrefix: "/api/register",
   },
   student: {
     routeGroup: "(student)",
+    subdomain: "student",
     basePath: "/student",
     apiPrefix: "/api/student",
   },
