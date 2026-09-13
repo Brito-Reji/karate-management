@@ -55,23 +55,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       target.approvedBy = admin.userId;
       target.rejectionReason = undefined;
 
-      const instructorName = target.name.trim();
       const validDojoIds = (target.dojoIds || []).filter((id) =>
         mongoose.Types.ObjectId.isValid(id)
       );
 
-      if (validDojoIds.length > 0 && instructorName) {
+      if (validDojoIds.length > 0) {
         await Dojo.updateMany(
           { _id: { $in: validDojoIds } },
-          { $addToSet: { instructors: instructorName } }
+          { $addToSet: { instructorIds: target._id } }
         );
-
-        const dojos = await Dojo.find({ _id: { $in: validDojoIds } });
-        for (const dojo of dojos) {
-          const instructors = dojo.instructors || [];
-          dojo.instructor = instructors.join(", ");
-          await dojo.save();
-        }
 
         revalidateDojosCache();
       }

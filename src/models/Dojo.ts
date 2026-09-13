@@ -8,6 +8,7 @@ export type DojoDocument = {
   location: string;
   instructors?: string[];
   instructor?: string;
+  instructorIds?: mongoose.Types.ObjectId[];
 };
 
 const dojoSchema = new mongoose.Schema(
@@ -36,6 +37,10 @@ const dojoSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    instructorIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -45,6 +50,10 @@ const dojoSchema = new mongoose.Schema(
 dojoSchema.index({ createdAt: -1 });
 dojoSchema.index({ name: 1 });
 dojoSchema.index({ location: 1 });
+
+if (process.env.NODE_ENV !== "production" && mongoose.models.Dojo) {
+  mongoose.deleteModel("Dojo");
+}
 
 const Dojo =
   (mongoose.models.Dojo as Model<DojoDocument> | undefined) ||
