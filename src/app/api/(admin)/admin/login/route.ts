@@ -19,6 +19,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (user.role === "instructor" && user.emailVerified === false) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Please verify your email to complete registration. Check your inbox for the verification code.",
+      },
+      { status: 403 }
+    );
+  }
+
   if (user.approvalStatus === "pending") {
     return NextResponse.json(
       {

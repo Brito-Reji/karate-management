@@ -3,6 +3,8 @@ import User from "@/models/User";
 import Dojo from "@/models/Dojo";
 import { isDuplicateKeyError } from "@/lib/requireAuth";
 import { hashPassword } from "@/lib/password";
+import { generateOtp, getOtpExpiry, hashOtp } from "@/lib/otp";
+import { sendInstructorOtpEmail } from "@/lib/email";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -68,29 +70,83 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     const hashed = await hashPassword(password);
+    const otp = generateOtp();
+    const otpHash = await hashOtp(otp);
+    const otpExpiresAt = getOtpExpiry();
+
+    const existing = await User.findOne({ email: normalizedEmail });
+
+    if (existing) {
+      if (existing.emailVerified) {
+        return NextResponse.json(
+          { success: false, message: "A user with this email already exists" },
+          { status: 409 }
+        );
+      }
+
+      if (existing.role !== "instructor") {
+        return NextResponse.json(
+          { success: false, message: "A user with this email already exists" },
+          { status: 409 }
+        );
+      }
+
+      existing.name = name.trim();
+      existing.phone = phone.trim();
+      existing.password = hashed;
+      existing.dojoIds = dojoIds;
+      existing.emailOtpHash = otpHash;
+      existing.emailOtpExpiresAt = otpExpiresAt;
+      existing.appliedAt = new Date();
+      await existing.save();
+
+      await sendInstructorOtpEmail(normalizedEmail, otp, name.trim());
+
+      return NextResponse.json({
+        success: true,
+        requiresVerification: true,
+        message: "Verification code sent to your email.",
+        email: normalizedEmail,
+      });
+    }
+
+    const existingPhone = await User.findOne({ phone: phone.trim() });
+    if (existingPhone && existingPhone.emailVerified) {
+      return NextResponse.json(
+        { success: false, message: "A user with this phone number already exists" },
+        { status: 409 }
+      );
+    }
 
     const user = await User.create({
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       phone: phone.trim(),
       password: hashed,
       role: "instructor",
       approvalStatus: "pending",
       isBlocked: true,
+      emailVerified: false,
+      emailOtpHash: otpHash,
+      emailOtpExpiresAt: otpExpiresAt,
       dojoIds,
       appliedAt: new Date(),
     });
 
+    await sendInstructorOtpEmail(normalizedEmail, otp, name.trim());
+
     const safe = user.toObject();
     delete safe.password;
     delete safe.refreshToken;
+    delete safe.emailOtpHash;
 
     return NextResponse.json({
       success: true,
-      message:
-        "Your application has been submitted. An admin will review it shortly.",
-      user: safe,
+      requiresVerification: true,
+      message: "Verification code sent to your email.",
+      email: normalizedEmail,
     });
   } catch (err) {
     if (isDuplicateKeyError(err)) {
@@ -101,7 +157,7 @@ export async function POST(request: Request) {
     }
     const message = err instanceof Error ? err.message : "Registration failed";
     return NextResponse.json(
-      { success: false, message: "Registration failed", error: message },
+      { success: false, message: message.includes("Email service") ? message : "Registration failed", error: message },
       { status: 500 }
     );
   }

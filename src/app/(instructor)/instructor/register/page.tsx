@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import PasswordInput from '@/components/PasswordInput';
 
 type DojoOption = {
@@ -12,6 +13,7 @@ type DojoOption = {
 };
 
 export default function InstructorRegisterPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -25,7 +27,6 @@ export default function InstructorRegisterPage() {
   const [loadingDojos, setLoadingDojos] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const loadDojos = async () => {
@@ -99,8 +100,14 @@ export default function InstructorRegisterPage() {
 
       const data = await res.json();
 
-      if (data.success) {
-        setSuccess(true);
+      if (data.success && data.requiresVerification) {
+        router.push(
+          `/instructor/register/verify-email?email=${encodeURIComponent(data.email || formData.email)}`
+        );
+      } else if (data.success) {
+        router.push(
+          `/instructor/register/verify-email?email=${encodeURIComponent(formData.email)}`
+        );
       } else {
         setError(data.message || 'Registration failed');
       }
@@ -110,35 +117,6 @@ export default function InstructorRegisterPage() {
       setLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="relative min-h-screen min-h-[100dvh] w-full flex items-center justify-center bg-zinc-950 px-4 py-8 sm:py-12 overflow-x-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(500px,90vw)] h-[min(500px,90vw)] bg-emerald-800/10 rounded-full blur-[120px] pointer-events-none" />
-
-        <div className="w-full max-w-[440px] z-10 text-center">
-          <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 sm:p-10 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
-            <div className="w-12 h-12 mx-auto mb-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-lg font-medium text-zinc-100 mb-2">Application Submitted</h1>
-            <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-              Your instructor registration has been sent for admin approval.
-              You will be able to log in once your account is approved.
-            </p>
-            <Link
-              href="/admin/login"
-              className="inline-flex h-11 items-center justify-center px-6 bg-zinc-100 hover:bg-white text-zinc-950 text-sm font-medium rounded-lg transition-all"
-            >
-              Back to Login
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen min-h-[100dvh] w-full flex items-center justify-center bg-zinc-950 px-4 py-8 sm:py-12 overflow-x-hidden">

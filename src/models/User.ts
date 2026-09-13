@@ -11,6 +11,9 @@ export type UserDocument = {
   role: "admin" | "instructor" | "student";
   isBlocked?: boolean;
   approvalStatus?: ApprovalStatus;
+  emailVerified?: boolean;
+  emailOtpHash?: string;
+  emailOtpExpiresAt?: Date;
   dojoIds?: string[];
   appliedAt?: Date;
   approvedAt?: Date;
@@ -33,6 +36,9 @@ const userSchema = new Schema({
       enum: ["pending", "approved", "rejected"],
       default: "approved",
     },
+    emailVerified: { type: Boolean, default: true },
+    emailOtpHash: { type: String },
+    emailOtpExpiresAt: { type: Date },
     dojoIds: { type: [String], default: [] },
     appliedAt: { type: Date },
     approvedAt: { type: Date },

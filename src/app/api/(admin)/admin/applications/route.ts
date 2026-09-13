@@ -14,6 +14,7 @@ export async function GET() {
     const applications = await User.find({
       role: "instructor",
       approvalStatus: "pending",
+      emailVerified: true,
     })
       .select("-password -refreshToken")
       .sort({ appliedAt: -1, createdAt: -1 })
