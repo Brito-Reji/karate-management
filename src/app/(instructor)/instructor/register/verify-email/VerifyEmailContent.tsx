@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getGmailInboxUrl } from '@/lib/emailLinks';
 import { usePortalHref, usePortalPath } from '@/hooks/usePortalRouting';
 
 export default function VerifyEmailContent() {
@@ -71,10 +70,6 @@ export default function VerifyEmailContent() {
     const focusIndex = Math.min(pasted.length, 5);
     inputRefs.current[focusIndex]?.focus();
   };
-
-  const openGmail = useCallback(() => {
-    window.open(getGmailInboxUrl(), '_blank', 'noopener,noreferrer');
-  }, []);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,20 +192,6 @@ export default function VerifyEmailContent() {
               Can&apos;t find it? Check your <span className="text-zinc-400">spam or junk folder</span> too.
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={openGmail}
-            className="w-full h-11 mb-6 flex items-center justify-center gap-2.5 bg-white hover:bg-zinc-100 text-zinc-900 text-sm font-medium rounded-lg transition-all border border-zinc-200/10"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-              <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-7.545-4.91v9.273H.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L12 9.546l8.073-6.053C21.69 2.28 24 3.434 24 5.457z" />
-              <path fill="#34A853" d="M12 16.64 5.455 11.73V24h13.09V11.73L12 16.64z" />
-              <path fill="#4A90E2" d="M12 9.546 3.927 3.493C2.31 2.28 0 3.434 0 5.457v.09L12 16.64 24 5.547v-.09C24 3.434 21.69 2.28 20.073 3.493L12 9.546z" />
-              <path fill="#FBBC05" d="M0 5.547v.09L12 16.64 24 5.637v-.09C24 3.434 21.69 2.28 20.073 3.493L12 9.546 3.927 3.493C2.31 2.28 0 3.434 0 5.547z" />
-            </svg>
-            Open Gmail
-          </button>
 
           {error && (
             <div className="mb-6 p-3 rounded-lg bg-red-950/20 border border-red-500/20 text-xs text-red-400 text-center tracking-wide">
