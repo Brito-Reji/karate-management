@@ -1,23 +1,30 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import { setAuthCookie, verifyAuthToken } from "@/lib/authCookie";
+import {
+  clearAuthCookie,
+  setAuthCookie,
+  verifyAuthToken,
+} from "@/lib/authCookie";
 import { type NextRequest, NextResponse } from "next/server";
+
+function unauthenticatedResponse(message: string, clearCookie = false) {
+  const response = NextResponse.json(
+    { success: false, message },
+    { status: 401 }
+  );
+  if (clearCookie) clearAuthCookie(response);
+  return response;
+}
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
   if (!token) {
-    return NextResponse.json(
-      { success: false, message: "Not authenticated" },
-      { status: 401 }
-    );
+    return unauthenticatedResponse("Not authenticated");
   }
 
   const payload = await verifyAuthToken(token);
   if (!payload) {
-    return NextResponse.json(
-      { success: false, message: "Invalid token" },
-      { status: 401 }
-    );
+    return unauthenticatedResponse("Invalid token", true);
   }
 
   try {
@@ -27,10 +34,7 @@ export async function GET(req: NextRequest) {
       .lean();
 
     if (!user || user.isBlocked) {
-      return NextResponse.json(
-        { success: false, message: "Not authenticated" },
-        { status: 401 }
-      );
+      return unauthenticatedResponse("Not authenticated", true);
     }
 
     const authUser = {

@@ -31,10 +31,9 @@ export default function AdminLogin() {
       const data = await res.json();
 
       if (data.success) {
-        // Drop them cleanly into the root admin path (/admin/page.js)
         router.push('/admin/dojos');
       } else {
-        setError(data.error || 'Invalid credentials');
+        setError(data.error || data.message || 'Invalid credentials');
       }
     } catch (err) {
       setError('Connection to security protocol failed.');

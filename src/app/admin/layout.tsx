@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,15 +12,33 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: currentUser } = useQuery({
+  const signingOutRef = useRef(false);
+  const { data: currentUser, isError: meError } = useQuery({
     ...meQuery,
     enabled: pathname !== '/admin/login',
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   // close drawer on navigation
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  // redirect blocked or expired sessions to login (clear cookie to avoid proxy redirect loop)
+  useEffect(() => {
+    if (pathname === '/admin/login' || !meError || signingOutRef.current) return;
+    signingOutRef.current = true;
+
+    void (async () => {
+      try {
+        await fetch('/api/admin/logout', { method: 'POST' });
+      } finally {
+        queryClient.removeQueries({ queryKey: meQuery.queryKey });
+        router.replace('/admin/login');
+      }
+    })();
+  }, [meError, pathname, queryClient, router]);
 
   // lock body scroll when drawer open
   useEffect(() => {

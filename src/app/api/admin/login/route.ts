@@ -19,6 +19,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (user.isBlocked) {
+    return NextResponse.json(
+      { success: false, error: "This account is blocked" },
+      { status: 403 }
+    );
+  }
+
   // Upgrade legacy plain-text passwords to bcrypt on successful login
   if (user.password && !isHashedPassword(user.password)) {
     user.password = await hashPassword(password);
