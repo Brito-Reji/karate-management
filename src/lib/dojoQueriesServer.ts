@@ -1,9 +1,15 @@
 import { unstable_cache } from "next/cache";
 import connectDB from "@/lib/db";
 import Dojo from "@/models/Dojo";
+import User from "@/models/User";
 import { attachDojoStudentCounts } from "@/lib/dojoStudentCounts";
 import { CACHE_TAGS } from "@/lib/cacheTags";
 import { prefixRegex } from "@/lib/mongoSearch";
+
+export type RegisteredInstructor = {
+  _id: string;
+  name: string;
+};
 
 export type DojoListItem = {
   _id: string;
@@ -12,22 +18,100 @@ export type DojoListItem = {
   location?: string;
   instructor?: string;
   instructors: string[];
+  instructorIds: string[];
+  registeredInstructors: RegisteredInstructor[];
   count?: number;
 };
 
 export const NO_MATCH_DOJO_ID = "__no_match__";
 
-export function normalizeDojo(dojo: Record<string, unknown>): DojoListItem {
-  const instructors = Array.isArray(dojo.instructors) && dojo.instructors.length > 0
-    ? (dojo.instructors as string[])
-    : typeof dojo.instructor === "string"
-      ? dojo.instructor.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
+function extractRegisteredInstructors(
+  rawIds: unknown,
+  nameById?: Map<string, string>
+): RegisteredInstructor[] {
+  if (!Array.isArray(rawIds)) return [];
+
+  const populated = rawIds
+    .filter(
+      (entry): entry is { _id: unknown; name: string } =>
+        entry !== null &&
+        typeof entry === "object" &&
+        "name" in entry &&
+        typeof (entry as { name: unknown }).name === "string"
+    )
+    .map((entry) => ({
+      _id: String(entry._id),
+      name: entry.name,
+    }));
+
+  if (populated.length > 0) return populated;
+
+  if (!nameById) {
+    return rawIds.map((id) => ({ _id: String(id), name: "" }));
+  }
+
+  return rawIds
+    .map((id) => String(id))
+    .filter((id) => nameById.has(id))
+    .map((id) => ({ _id: id, name: nameById.get(id)! }));
+}
+
+async function buildInstructorNameMap(
+  dojos: Record<string, unknown>[]
+): Promise<Map<string, string>> {
+  const idSet = new Set<string>();
+  for (const dojo of dojos) {
+    if (!Array.isArray(dojo.instructorIds)) continue;
+    for (const id of dojo.instructorIds) {
+      if (id && typeof id === "object" && "name" in id) continue;
+      idSet.add(String(id));
+    }
+  }
+
+  if (idSet.size === 0) return new Map();
+
+  const users = await User.find({ _id: { $in: [...idSet] } })
+    .select("name")
+    .lean();
+
+  return new Map(users.map((u) => [String(u._id), u.name as string]));
+}
+
+export function normalizeDojo(
+  dojo: Record<string, unknown>,
+  nameById?: Map<string, string>
+): DojoListItem {
+  const instructors =
+    Array.isArray(dojo.instructors) && dojo.instructors.length > 0
+      ? (dojo.instructors as string[])
+      : typeof dojo.instructor === "string"
+        ? dojo.instructor
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
+  const registeredInstructors = extractRegisteredInstructors(
+    dojo.instructorIds,
+    nameById
+  ).filter((i) => i.name);
+  const instructorIds = Array.isArray(dojo.instructorIds)
+    ? registeredInstructors.length > 0
+      ? registeredInstructors.map((i) => i._id)
+      : (dojo.instructorIds as unknown[]).map(String)
+    : [];
+
+  const { instructorIds: _rawIds, ...rest } = dojo;
 
   return {
-    ...(dojo as Omit<DojoListItem, "_id" | "instructors">),
+    ...(rest as Omit<
+      DojoListItem,
+      "_id" | "instructors" | "instructorIds" | "registeredInstructors"
+    >),
     _id: String(dojo._id),
     instructors,
+    instructorIds,
+    registeredInstructors,
   };
 }
 
@@ -77,9 +161,22 @@ export async function resolveStudentDojoFilter(
   return { dojoId };
 }
 
-export function dojoSearchFilter(search: string) {
+export async function dojoSearchFilter(search: string) {
   if (!search) return {};
   const q = prefixRegex(search);
+
+  const matchingInstructors = await User.find({
+    role: "instructor",
+    name: q,
+  })
+    .select("_id")
+    .lean();
+
+  const instructorIdFilter =
+    matchingInstructors.length > 0
+      ? [{ instructorIds: { $in: matchingInstructors.map((u) => u._id) } }]
+      : [];
+
   return {
     $or: [
       { name: q },
@@ -87,21 +184,32 @@ export function dojoSearchFilter(search: string) {
       { location: q },
       { instructor: q },
       { instructors: q },
+      ...instructorIdFilter,
     ],
   };
 }
 
 export async function queryDojosWithCounts(page: number, limit: number, search: string) {
   await connectDB();
-  const filter = dojoSearchFilter(search);
+  const filter = await dojoSearchFilter(search);
   const skip = (page - 1) * limit;
 
   const [dojos, total] = await Promise.all([
-    Dojo.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }).lean(),
+    Dojo.find(filter)
+      .select("_id dojoId name location instructor instructors instructorIds createdAt")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean(),
     Dojo.countDocuments(filter),
   ]);
 
-  const mapped = dojos.map((dojo) => normalizeDojo(dojo as Record<string, unknown>));
+  const nameById = await buildInstructorNameMap(
+    dojos as Record<string, unknown>[]
+  );
+  const mapped = dojos.map((dojo) =>
+    normalizeDojo(dojo as Record<string, unknown>, nameById)
+  );
   const data = await attachDojoStudentCounts(mapped);
 
   return {
@@ -127,17 +235,23 @@ export type DojoDropdownOption = {
   location: string;
   instructor?: string;
   instructors: string[];
+  instructorIds: string[];
+  registeredInstructors: RegisteredInstructor[];
 };
 
 export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
   await connectDB();
   const dojos = await Dojo.find({})
-    .select("_id dojoId name location instructor instructors")
+    .select("_id dojoId name location instructor instructors instructorIds")
     .sort({ location: 1 })
     .lean();
 
+  const nameById = await buildInstructorNameMap(
+    dojos as Record<string, unknown>[]
+  );
+
   return dojos.map((dojo) => {
-    const normalized = normalizeDojo(dojo as Record<string, unknown>);
+    const normalized = normalizeDojo(dojo as Record<string, unknown>, nameById);
     return {
       _id: normalized._id,
       dojoId: normalized.dojoId,
@@ -148,6 +262,8 @@ export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
           ? normalized.instructors.join(", ")
           : normalized.instructor,
       instructors: normalized.instructors,
+      instructorIds: normalized.instructorIds,
+      registeredInstructors: normalized.registeredInstructors,
     };
   });
 }

@@ -4,6 +4,10 @@ import connectDB from "@/lib/db";
 import { requireStaff } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { normalizeDojo } from "@/lib/dojoQueriesServer";
+import {
+  validateInstructorIds,
+  syncUserDojoIdsForInstructors,
+} from "@/lib/dojoInstructors";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,25 +20,49 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     await connectDB();
 
-    const { name, location, instructor, instructors } = await request.json();
+    const { name, location, instructor, instructors, instructorIds } =
+      await request.json();
     const { id } = await params;
-    
+
+    const existing = await Dojo.findById(id).select("instructorIds").lean();
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, message: "Dojo not found" },
+        { status: 404 }
+      );
+    }
+
     const finalInstructors = Array.isArray(instructors)
       ? instructors.filter(Boolean)
-      : (instructor ? [instructor] : []);
+      : instructor
+        ? [instructor]
+        : [];
 
     const finalInstructor = finalInstructors.join(", ");
 
-    const dojo = await Dojo.findByIdAndUpdate(
-      id,
-      {
-        name,
-        location,
-        instructor: finalInstructor,
-        instructors: finalInstructors,
-      },
-      { new: true, runValidators: true }
-    ).lean();
+    const previousIds = (existing.instructorIds || []).map(String);
+    const updatePayload: Record<string, unknown> = {
+      name,
+      location,
+      instructor: finalInstructor,
+      instructors: finalInstructors,
+    };
+
+    let nextIds = previousIds;
+    if (instructorIds !== undefined) {
+      const validatedInstructorIds = await validateInstructorIds(instructorIds);
+      updatePayload.instructorIds = validatedInstructorIds;
+      nextIds = validatedInstructorIds.map(String);
+    }
+
+    const dojo = await Dojo.findByIdAndUpdate(id, updatePayload, {
+      new: true,
+      runValidators: true,
+    }).lean();
+
+    if (instructorIds !== undefined) {
+      await syncUserDojoIdsForInstructors(id, previousIds, nextIds);
+    }
 
     if (!dojo) {
       return NextResponse.json(
@@ -50,9 +78,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       dojo: normalizeDojo(dojo as Record<string, unknown>),
     });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to update dojo";
+    const isValidation =
+      message.includes("invalid") || message.includes("not approved");
     return NextResponse.json(
-      { success: false, message: "Failed to update dojo" },
-      { status: 500 }
+      { success: false, message: isValidation ? message : "Failed to update dojo" },
+      { status: isValidation ? 400 : 500 }
     );
   }
 }

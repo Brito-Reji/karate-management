@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useInfiniteDojos, useCreateDojo, useUpdateDojo } from '@/hooks/useDojos';
 import useDebounce from '@/hooks/useDebounce';
 import { useSearchDojos } from '@/hooks/useSearchDojos';
+import { useStaffUsers } from '@/hooks/useStaffUsers';
 import RowIndexBadge from '@/components/RowIndexBadge';
 
 // skeleton shown during loading
@@ -40,7 +41,12 @@ function DojosContent() {
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingDojo, setEditingDojo]   = useState(null);
-  const [formData, setFormData] = useState({ name: '', location: '', instructors: [''] });
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    instructors: [''],
+    instructorIds: [] as string[],
+  });
   const [formError, setFormError] = useState('');
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +90,18 @@ function DojosContent() {
 
   const createDojo = useCreateDojo();
   const updateDojo = useUpdateDojo();
+  const { data: staffUsers = [] } = useStaffUsers(isModalOpen);
+
+  const approvedInstructors = useMemo(
+    () =>
+      staffUsers.filter(
+        (u) =>
+          u.role === 'instructor' &&
+          !u.isBlocked &&
+          (u.approvalStatus === 'approved' || !u.approvalStatus)
+      ),
+    [staffUsers]
+  );
 
   const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -118,7 +136,7 @@ function DojosContent() {
 
   const openCreateModal = () => {
     setEditingDojo(null);
-    setFormData({ name: '', location: '', instructors: [''] });
+    setFormData({ name: '', location: '', instructors: [''], instructorIds: [] });
     setFormError('');
     setIsModalOpen(true);
   };
@@ -134,6 +152,7 @@ function DojosContent() {
       name: dojo.name,
       location: dojo.location,
       instructors: parsedInstructors.length > 0 ? parsedInstructors : [''],
+      instructorIds: dojo.instructorIds ?? [],
     });
     setFormError('');
     setIsModalOpen(true);
@@ -154,6 +173,7 @@ function DojosContent() {
       name: formData.name,
       location: formData.location,
       instructors: cleanedInstructors,
+      instructorIds: formData.instructorIds,
     };
 
     if (editingDojo) {
@@ -268,6 +288,18 @@ function DojosContent() {
                           <span className="text-zinc-700">•</span>
                           <span className="break-words">{dojo.location}</span>
                         </div>
+                        {dojo.registeredInstructors && dojo.registeredInstructors.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {dojo.registeredInstructors.map((inst) => (
+                              <span
+                                key={inst._id}
+                                className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-950/30 border border-sky-500/20 text-sky-300"
+                              >
+                                {inst.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -386,7 +418,7 @@ function DojosContent() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Assigned Instructors</label>
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Legacy Instructors (names)</label>
                   <button
                     type="button"
                     onClick={() => setFormData({
@@ -434,6 +466,46 @@ function DojosContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-zinc-400 tracking-wide">
+                  Registered Instructors (accounts)
+                </label>
+                <p className="text-[11px] text-zinc-600">
+                  Link approved instructor accounts. Kept separate from legacy name fields during migration.
+                </p>
+                {approvedInstructors.length === 0 ? (
+                  <p className="text-xs text-zinc-600 italic">No approved instructors available yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 border border-white/[0.06] rounded-lg p-2">
+                    {approvedInstructors.map((user) => {
+                      const checked = formData.instructorIds.includes(user._id);
+                      return (
+                        <label
+                          key={user._id}
+                          className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const next = checked
+                                ? formData.instructorIds.filter((id) => id !== user._id)
+                                : [...formData.instructorIds, user._id];
+                              setFormData({ ...formData, instructorIds: next });
+                            }}
+                            className="rounded border-zinc-700 bg-zinc-900 text-sky-500 focus:ring-sky-500/30"
+                          />
+                          <span className="text-sm text-zinc-300">{user.name}</span>
+                          {user.email && (
+                            <span className="text-[10px] text-zinc-600 truncate">{user.email}</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-2">

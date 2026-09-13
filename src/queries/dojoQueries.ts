@@ -1,6 +1,11 @@
 // dojo API functions — colocated with the domain
 import { queryKeys } from '@/lib/queryKeys';
 
+export type RegisteredInstructor = {
+  _id: string;
+  name: string;
+};
+
 export type Dojo = {
   _id: string;
   dojoId?: string;
@@ -8,6 +13,8 @@ export type Dojo = {
   location: string;
   instructor?: string;
   instructors?: string[];
+  instructorIds?: string[];
+  registeredInstructors?: RegisteredInstructor[];
   status?: "Active" | "Inactive";
   count?: number;
 };
@@ -17,6 +24,7 @@ export type DojoInput = {
   location: string;
   instructor?: string;
   instructors?: string[];
+  instructorIds?: string[];
 };
 
 export type DojoListResponse = {

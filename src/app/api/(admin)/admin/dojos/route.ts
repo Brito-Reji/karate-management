@@ -4,6 +4,10 @@ import connectDB from "@/lib/db";
 import { requireStaff } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { getCachedDojosWithCounts } from "@/lib/dojoQueriesServer";
+import {
+  validateInstructorIds,
+  syncUserDojoIdsForInstructors,
+} from "@/lib/dojoInstructors";
 
 export async function POST(request) {
   const { error } = await requireStaff();
@@ -12,7 +16,8 @@ export async function POST(request) {
   try {
     await connectDB();
 
-    const { name, location, instructor, instructors } = await request.json();
+    const { name, location, instructor, instructors, instructorIds } =
+      await request.json();
 
     const count = await Dojo.countDocuments();
     const dojoId = `DJ-${String(count + 1).padStart(2, "0")}`;
@@ -24,14 +29,24 @@ export async function POST(request) {
         : [];
 
     const finalInstructor = finalInstructors.join(", ");
+    const validatedInstructorIds = await validateInstructorIds(instructorIds);
 
     const dojo = await Dojo.create({
       name,
       location,
       instructor: finalInstructor,
       instructors: finalInstructors,
+      instructorIds: validatedInstructorIds,
       dojoId,
     });
+
+    if (validatedInstructorIds.length > 0) {
+      await syncUserDojoIdsForInstructors(
+        String(dojo._id),
+        [],
+        validatedInstructorIds.map(String)
+      );
+    }
 
     revalidateDojosCache();
 
@@ -40,13 +55,17 @@ export async function POST(request) {
       dojo,
     });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to create dojo";
+    const isValidation =
+      message.includes("invalid") || message.includes("not approved");
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to create dojo",
+        message: isValidation ? message : "Failed to create dojo",
       },
       {
-        status: 500,
+        status: isValidation ? 400 : 500,
       }
     );
   }

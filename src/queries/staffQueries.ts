@@ -7,6 +7,7 @@ export type StaffUser = {
   phone?: string;
   role: 'admin' | 'instructor';
   isBlocked?: boolean;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   createdAt?: string;
 };
 
