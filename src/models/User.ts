@@ -1,6 +1,8 @@
 import mongoose, { type Model } from "mongoose";
 const { Schema } = mongoose;
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export type UserDocument = {
   name: string;
   email?: string;
@@ -8,6 +10,12 @@ export type UserDocument = {
   password?: string;
   role: "admin" | "instructor" | "student";
   isBlocked?: boolean;
+  approvalStatus?: ApprovalStatus;
+  dojoIds?: string[];
+  appliedAt?: Date;
+  approvedAt?: Date;
+  approvedBy?: string;
+  rejectionReason?: string;
   refreshToken?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -20,6 +28,16 @@ const userSchema = new Schema({
     password: { type: String },
     role: { type: String, required: true, enum: ["admin", "instructor", "student"] },
     isBlocked: { type: Boolean, default: false },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
+    },
+    dojoIds: { type: [String], default: [] },
+    appliedAt: { type: Date },
+    approvedAt: { type: Date },
+    approvedBy: { type: String },
+    rejectionReason: { type: String },
     refreshToken: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

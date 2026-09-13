@@ -142,6 +142,13 @@ export default function AdminLogin() {
               )}
             </button>
           </form>
+
+          <p className="text-center text-xs text-zinc-500 mt-6">
+            New instructor?{' '}
+            <a href="/instructor/register" className="text-zinc-300 hover:text-white transition-colors">
+              Register here
+            </a>
+          </p>
         </div>
       </div>
     </div>
