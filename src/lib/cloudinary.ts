@@ -65,6 +65,10 @@ export function getCloudinary() {
 export type CloudinaryUploadFolder = "karate/instructors";
 
 export function signUploadParams(folder: CloudinaryUploadFolder) {
+  if (!credentials) {
+    throw new Error("Cloudinary is not configured");
+  }
+
   const cld = getCloudinary();
   const timestamp = Math.round(Date.now() / 1000);
 
@@ -73,12 +77,7 @@ export function signUploadParams(folder: CloudinaryUploadFolder) {
     folder,
   };
 
-  const signature = cld.utils.api_sign_request(
-    params,
-    credentials.apiSecret,
-    null,
-    1
-  );
+  const signature = cld.utils.api_sign_request(params, credentials.apiSecret);
 
   return {
     cloudName: credentials.cloudName,
