@@ -62,6 +62,11 @@ export default function InstructorRegisterPage() {
     });
   }, [dojos, dojoSearch]);
 
+  const selectedDojos = useMemo(
+    () => dojos.filter((dojo) => selectedDojoIds.includes(dojo._id)),
+    [dojos, selectedDojoIds]
+  );
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -266,28 +271,57 @@ export default function InstructorRegisterPage() {
               <p className="text-[11px] text-zinc-600">Select all dojos you belong to</p>
 
               {!loadingDojos && dojos.length > 0 && (
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={dojoSearch}
+                      onChange={(e) => setDojoSearch(e.target.value)}
+                      disabled={loading}
+                      placeholder="Search by name, ID, or location..."
+                      className="w-full h-9 pl-9 pr-14 rounded-lg bg-zinc-900/50 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 transition-all"
+                    />
+                    {dojoSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDojoSearch('')}
+                        className="absolute inset-y-0 right-0 pr-3 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    value={dojoSearch}
-                    onChange={(e) => setDojoSearch(e.target.value)}
-                    disabled={loading}
-                    placeholder="Search by name, ID, or location..."
-                    className="w-full h-9 pl-9 pr-14 rounded-lg bg-zinc-900/50 border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 transition-all"
-                  />
-                  {dojoSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setDojoSearch('')}
-                      className="absolute inset-y-0 right-0 pr-3 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                    >
-                      Clear
-                    </button>
+
+                  {selectedDojos.length > 0 && (
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-2">
+                      <p className="text-[10px] text-emerald-400/70 uppercase tracking-wider mb-1.5">
+                        Selected ({selectedDojos.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedDojos.map((dojo) => (
+                          <button
+                            key={dojo._id}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => toggleDojo(dojo._id)}
+                            className="group inline-flex items-center gap-1 max-w-full px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/25 text-left hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+                            title={`Remove ${dojo.name}`}
+                          >
+                            <span className="text-xs font-medium text-emerald-200 truncate max-w-[160px]">
+                              {dojo.name}
+                            </span>
+                            <svg className="w-3 h-3 shrink-0 text-emerald-400/60 group-hover:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

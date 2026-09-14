@@ -19,10 +19,14 @@ const INSTRUCTOR_PUBLIC_PATHS = [
   "/instructor/login",
   "/instructor/register",
   "/instructor/register/verify-email",
+  "/instructor/forgot-password",
+  "/instructor/reset-password",
   "/api/register/instructor",
   "/api/register/instructor/cloudinary-sign",
   "/api/register/instructor/verify-otp",
   "/api/register/instructor/resend-otp",
+  "/api/instructor/forgot-password",
+  "/api/instructor/reset-password",
 ];
 
 function redirectTo(url: string, request: NextRequest) {

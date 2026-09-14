@@ -9,7 +9,7 @@ import { matchesPortalPath } from '@/lib/portalRouting';
 import { usePortalHost } from '@/components/PortalHostProvider';
 import { usePortalPath } from '@/hooks/usePortalRouting';
 
-const PUBLIC_PATHS = ['/login', '/register'];
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 export default function InstructorPortalLayout({
   children,
