@@ -14,6 +14,8 @@ export type UserDocument = {
   emailVerified?: boolean;
   emailOtpHash?: string;
   emailOtpExpiresAt?: Date;
+  passwordResetOtpHash?: string;
+  passwordResetOtpExpiresAt?: Date;
   dojoIds?: string[];
   avatarUrl?: string;
   avatarPublicId?: string;
@@ -42,6 +44,8 @@ const userSchema = new Schema({
     emailVerified: { type: Boolean, default: true },
     emailOtpHash: { type: String },
     emailOtpExpiresAt: { type: Date },
+    passwordResetOtpHash: { type: String },
+    passwordResetOtpExpiresAt: { type: Date },
     dojoIds: { type: [String], default: [] },
     avatarUrl: { type: String },
     avatarPublicId: { type: String },

@@ -7,6 +7,7 @@ export default function InstructorLogin() {
   const dojosPath = usePortalPath('instructor', '/dojos');
   const adminDojosHref = usePortalHref('admin', '/dojos');
   const registerHref = usePortalHref('instructor', '/register');
+  const forgotPasswordHref = usePortalHref('instructor', '/forgot-password');
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -128,6 +129,14 @@ export default function InstructorLogin() {
                     </svg>
                   )}
                 </button>
+              </div>
+              <div className="flex justify-end">
+                <a
+                  href={forgotPasswordHref}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  Forgot password?
+                </a>
               </div>
             </div>
 
