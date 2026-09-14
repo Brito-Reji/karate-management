@@ -42,6 +42,7 @@ type AddStudentModalProps = {
   initialName?: string;
   dojos: DojoDropdownOption[];
   onCreated?: (student: Student) => void;
+  requireDojo?: boolean;
 };
 
 export default function AddStudentModal({
@@ -50,6 +51,7 @@ export default function AddStudentModal({
   initialName = '',
   dojos,
   onCreated,
+  requireDojo = false,
 }: AddStudentModalProps) {
   const [formData, setFormData] = useState(emptyForm);
   const [formError, setFormError] = useState('');
@@ -57,14 +59,19 @@ export default function AddStudentModal({
 
   useEffect(() => {
     if (open) {
-      setFormData({ ...emptyForm, name: initialName });
+      const defaultDojoId = requireDojo && dojos.length === 1 ? dojos[0]._id : '';
+      setFormData({ ...emptyForm, name: initialName, dojoId: defaultDojoId });
       setFormError('');
     }
-  }, [open, initialName]);
+  }, [open, initialName, requireDojo, dojos]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
+    if (requireDojo && !formData.dojoId) {
+      setFormError('Please select a dojo for this student.');
+      return;
+    }
     setFormError('');
 
     const payload = {
@@ -96,7 +103,11 @@ export default function AddStudentModal({
       <div className="w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-8 shadow-[0_32px_64px_rgba(0,0,0,0.8)] z-10 relative sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="mb-6">
           <h2 className="text-base font-medium text-zinc-100 tracking-tight">Add New Student</h2>
-          <p className="text-xs text-zinc-500 mt-1">Enroll a new student into the academy.</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            {requireDojo
+              ? 'Enroll a new student into one of your assigned dojos.'
+              : 'Enroll a new student into the academy.'}
+          </p>
         </div>
 
         {formError && (
@@ -119,11 +130,11 @@ export default function AddStudentModal({
           </div>
 
           <DojoSelect
-            label="Dojo Branch"
+            label={requireDojo ? 'Dojo Branch (required)' : 'Dojo Branch'}
             value={formData.dojoId}
             onChange={(val) => setFormData({ ...formData, dojoId: val })}
             options={dojoOptions}
-            placeholder="Select a dojo..."
+            placeholder={requireDojo ? 'Select your dojo...' : 'Select a dojo...'}
           />
 
           <SearchableSelect

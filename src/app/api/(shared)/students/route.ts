@@ -1,7 +1,7 @@
 import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import { getNextSequence } from "@/models/Counter";
-import { requireStaff, getStudentScopeFilter, isDuplicateKeyError } from "@/lib/requireAuth";
+import { requireStaff, getStudentScopeFilter, assertInstructorCanUseDojo, isDuplicateKeyError } from "@/lib/requireAuth";
 import { prefixRegex } from "@/lib/mongoSearch";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { resolveStudentDojoFilter } from "@/lib/dojoQueriesServer";
@@ -27,7 +27,9 @@ export async function GET(request) {
     const status = searchParams.get("status")?.trim() || "";
     const createdBy = searchParams.get("createdBy")?.trim() || "";
 
-    const filter: Record<string, unknown> = { ...getStudentScopeFilter(user) };
+    const filter: Record<string, unknown> = {
+      ...(await getStudentScopeFilter(user)),
+    };
 
     if (user.role === "admin" && createdBy) {
       filter.createdBy = createdBy;
@@ -87,6 +89,14 @@ export async function POST(request) {
 
     const { name, dojoId, dob, gender, phoneNumber, belt, pendingFees, image, status } =
       await request.json();
+
+    const dojoCheck = await assertInstructorCanUseDojo(user, dojoId);
+    if (dojoCheck.ok === false) {
+      return NextResponse.json(
+        { success: false, message: dojoCheck.message },
+        { status: user.role === "instructor" ? 403 : 400 }
+      );
+    }
 
     const nextId = await getNextSequence("studentId");
 

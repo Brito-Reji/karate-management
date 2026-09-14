@@ -1,6 +1,7 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { verifyAuthToken } from "@/lib/authCookie";
+import { getAssignedDojoIds, isDojoAssignedToInstructor } from "@/lib/instructorDojos";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -57,18 +58,41 @@ export async function requireStaff() {
   return { user, error: null };
 }
 
-/** Admins see all students; instructors only see students they created. */
-export function getStudentScopeFilter(user: AuthUser): Record<string, unknown> {
+/** Admins see all students; instructors see students in their assigned dojos. */
+export async function getStudentScopeFilter(
+  user: AuthUser
+): Promise<Record<string, unknown>> {
   if (user.role === "admin") return {};
-  return { createdBy: user.userId };
+
+  const dojoIds = await getAssignedDojoIds(user.userId);
+  if (dojoIds.length === 0) {
+    return { dojoId: { $in: ["__no_match__"] } };
+  }
+  return { dojoId: { $in: dojoIds } };
 }
 
-export function canAccessStudent(
+export async function canAccessStudent(
   user: AuthUser,
-  student: { createdBy?: string | null }
-): boolean {
+  student: { dojoId?: string | null; createdBy?: string | null }
+): Promise<boolean> {
   if (user.role === "admin") return true;
-  return student.createdBy === user.userId;
+  if (!student.dojoId) return false;
+  return isDojoAssignedToInstructor(user.userId, student.dojoId);
+}
+
+export async function assertInstructorCanUseDojo(
+  user: AuthUser,
+  dojoId: string | undefined | null
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (user.role === "admin") return { ok: true };
+  if (!dojoId?.trim()) {
+    return { ok: false, message: "Dojo is required for instructor-created students" };
+  }
+  const allowed = await isDojoAssignedToInstructor(user.userId, dojoId);
+  if (!allowed) {
+    return { ok: false, message: "You are not assigned to this dojo" };
+  }
+  return { ok: true };
 }
 
 export async function requireAdmin() {

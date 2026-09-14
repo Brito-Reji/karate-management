@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/requireAuth";
-import { getCachedDojoOptions } from "@/lib/dojoQueriesServer";
+import {
+  getCachedDojoOptions,
+  queryInstructorDojoOptions,
+} from "@/lib/dojoQueriesServer";
 
 export async function GET() {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
-    const data = await getCachedDojoOptions();
+    const data =
+      user.role === "instructor"
+        ? await queryInstructorDojoOptions(user.userId)
+        : await getCachedDojoOptions();
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(

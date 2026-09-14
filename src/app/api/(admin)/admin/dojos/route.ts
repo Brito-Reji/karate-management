@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import Dojo from "@/models/Dojo";
 import connectDB from "@/lib/db";
-import { requireStaff } from "@/lib/requireAuth";
+import { requireStaff, requireAdmin } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
-import { getCachedDojosWithCounts } from "@/lib/dojoQueriesServer";
+import { getCachedDojosWithCounts, queryInstructorDojosWithCounts } from "@/lib/dojoQueriesServer";
 import {
   validateInstructorIds,
   syncUserDojoIdsForInstructors,
 } from "@/lib/dojoInstructors";
 
 export async function POST(request) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -72,7 +72,7 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
@@ -82,7 +82,10 @@ export async function GET(request) {
     const limit = Math.min(Number(searchParams.get("limit")) || 4, 100);
     const search = searchParams.get("search")?.trim() || "";
 
-    const result = await getCachedDojosWithCounts(page, limit, search);
+    const result =
+      user.role === "instructor"
+        ? await queryInstructorDojosWithCounts(user.userId, page, limit, search)
+        : await getCachedDojosWithCounts(page, limit, search);
 
     return NextResponse.json({
       success: true,

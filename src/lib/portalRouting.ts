@@ -68,7 +68,7 @@ export function portalHomeInternal(portal: PortalId): string {
     case "admin":
       return "/admin/dojos";
     case "instructor":
-      return "/instructor/register";
+      return "/instructor/dojos";
     case "student":
       return "/student";
   }
@@ -79,7 +79,9 @@ export function portalForPath(pathname: string): PortalId | null {
   if (pathname.startsWith("/instructor") || pathname.startsWith("/register")) {
     return "instructor";
   }
-  if (pathname.startsWith("/student")) return "student";
+  if (pathname === "/student" || pathname.startsWith("/student/")) {
+    return "student";
+  }
   return null;
 }
 
@@ -121,7 +123,7 @@ export function portalHomePath(portal: PortalId, host?: string): string {
     case "admin":
       return portalPath("admin", "/dojos", host);
     case "instructor":
-      return portalPath("instructor", "/register", host);
+      return portalPath("instructor", "/dojos", host);
     case "student":
       return portalPath("student", "/", host);
   }
@@ -252,6 +254,6 @@ export function matchesPortalPath(
 
 export function getCookieDomain(): string | undefined {
   const domain = getAppDomain();
-  if (!domain || process.env.NODE_ENV !== "production") return undefined;
+  if (!domain) return undefined;
   return `.${domain}`;
 }

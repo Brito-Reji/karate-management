@@ -5,6 +5,7 @@ import User from "@/models/User";
 import { attachDojoStudentCounts } from "@/lib/dojoStudentCounts";
 import { CACHE_TAGS } from "@/lib/cacheTags";
 import { prefixRegex } from "@/lib/mongoSearch";
+import { getAssignedDojoIds } from "@/lib/instructorDojos";
 
 export type RegisteredInstructor = {
   _id: string;
@@ -20,6 +21,7 @@ export type DojoListItem = {
   instructors: string[];
   instructorIds: string[];
   registeredInstructors: RegisteredInstructor[];
+  imageUrl?: string;
   count?: number;
 };
 
@@ -196,7 +198,7 @@ export async function queryDojosWithCounts(page: number, limit: number, search: 
 
   const [dojos, total] = await Promise.all([
     Dojo.find(filter)
-      .select("_id dojoId name location instructor instructors instructorIds createdAt")
+      .select("_id dojoId name location instructor instructors instructorIds imageUrl createdAt")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
@@ -242,7 +244,7 @@ export type DojoDropdownOption = {
 export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
   await connectDB();
   const dojos = await Dojo.find({})
-    .select("_id dojoId name location instructor instructors instructorIds")
+    .select("_id dojoId name location instructor instructors instructorIds imageUrl")
     .sort({ location: 1 })
     .lean();
 
@@ -274,4 +276,81 @@ export function getCachedDojoOptions() {
     ["dojos-options"],
     { revalidate: 60, tags: [CACHE_TAGS.dojos] }
   )();
+}
+
+export async function queryInstructorDojosWithCounts(
+  userId: string,
+  page: number,
+  limit: number,
+  search: string
+) {
+  await connectDB();
+  const assignedIds = await getAssignedDojoIds(userId);
+  if (assignedIds.length === 0) {
+    return { data: [], total: 0, page, totalPages: 1 };
+  }
+
+  const baseFilter = { _id: { $in: assignedIds } };
+  const searchFilter = search ? await dojoSearchFilter(search) : {};
+  const filter = { $and: [baseFilter, searchFilter] };
+  const skip = (page - 1) * limit;
+
+  const [dojos, total] = await Promise.all([
+    Dojo.find(filter)
+      .select("_id dojoId name location instructor instructors instructorIds imageUrl createdAt")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .lean(),
+    Dojo.countDocuments(filter),
+  ]);
+
+  const nameById = await buildInstructorNameMap(
+    dojos as Record<string, unknown>[]
+  );
+  const mapped = dojos.map((dojo) =>
+    normalizeDojo(dojo as Record<string, unknown>, nameById)
+  );
+  const data = await attachDojoStudentCounts(mapped);
+
+  return {
+    data,
+    total,
+    page,
+    totalPages: Math.ceil(total / Math.max(limit, 1)) || 1,
+  };
+}
+
+export async function queryInstructorDojoOptions(
+  userId: string
+): Promise<DojoDropdownOption[]> {
+  await connectDB();
+  const assignedIds = await getAssignedDojoIds(userId);
+  if (assignedIds.length === 0) return [];
+
+  const dojos = await Dojo.find({ _id: { $in: assignedIds } })
+    .select("_id dojoId name location instructor instructors instructorIds imageUrl")
+    .sort({ location: 1 })
+    .lean();
+
+  const nameById = await buildInstructorNameMap(
+    dojos as Record<string, unknown>[]
+  );
+
+  return dojos.map((dojo) => {
+    const normalized = normalizeDojo(dojo as Record<string, unknown>, nameById);
+    return {
+      _id: normalized._id,
+      dojoId: normalized.dojoId,
+      name: normalized.name ?? "",
+      location: normalized.location ?? "",
+      instructor:
+        normalized.instructors.length > 0
+          ? normalized.instructors.join(", ")
+          : normalized.instructor,
+      instructors: normalized.instructors,
+      instructorIds: normalized.instructorIds,
+      registeredInstructors: normalized.registeredInstructors,
+    };
+  });
 }

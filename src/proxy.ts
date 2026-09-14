@@ -15,6 +15,16 @@ import {
 
 const ADMIN_PUBLIC_PATHS = ["/admin/login", "/api/admin/login"];
 
+const INSTRUCTOR_PUBLIC_PATHS = [
+  "/instructor/login",
+  "/instructor/register",
+  "/instructor/register/verify-email",
+  "/api/register/instructor",
+  "/api/register/instructor/cloudinary-sign",
+  "/api/register/instructor/verify-otp",
+  "/api/register/instructor/resend-otp",
+];
+
 function redirectTo(url: string, request: NextRequest) {
   return NextResponse.redirect(new URL(url, request.url));
 }
@@ -35,7 +45,10 @@ async function handleAdminAuth(
   if (ADMIN_PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     if (pathname === "/admin/login" && token) {
       try {
-        await verifyToken(token);
+        const role = await verifyToken(token);
+        if (role === "instructor") {
+          return redirectTo(portalPath("instructor", "/dojos", host), request);
+        }
         return redirectTo(portalPath("admin", "/dojos", host), request);
       } catch {
         // invalid token -> continue to login
@@ -50,6 +63,10 @@ async function handleAdminAuth(
 
   try {
     const role = await verifyToken(token);
+
+    if (role === "instructor") {
+      return redirectTo(portalPath("instructor", "/dojos", host), request);
+    }
 
     if (pathname.startsWith("/admin/tests") && role !== "admin") {
       return redirectTo(portalPath("admin", "/dojos", host), request);
@@ -67,6 +84,43 @@ async function handleAdminAuth(
     return NextResponse.next();
   } catch {
     return redirectTo(portalPath("admin", "/login", host), request);
+  }
+}
+
+async function handleInstructorAuth(
+  request: NextRequest,
+  pathname: string,
+  host: string
+) {
+  const token = request.cookies.get("token")?.value;
+  const isPublic = INSTRUCTOR_PUBLIC_PATHS.some((path) =>
+    pathname.startsWith(path)
+  );
+
+  if (isPublic) {
+    if (pathname === "/instructor/login" && token) {
+      try {
+        const role = await verifyToken(token);
+        if (role === "admin") {
+          return redirectTo(portalPath("admin", "/dojos", host), request);
+        }
+        return redirectTo(portalPath("instructor", "/dojos", host), request);
+      } catch {
+        // invalid token -> continue to login
+      }
+    }
+    return NextResponse.next();
+  }
+
+  if (!token) {
+    return redirectTo(portalPath("instructor", "/login", host), request);
+  }
+
+  try {
+    await verifyToken(token);
+    return NextResponse.next();
+  } catch {
+    return redirectTo(portalPath("instructor", "/login", host), request);
   }
 }
 
@@ -161,6 +215,15 @@ export async function proxy(request: NextRequest) {
     }
 
     if (portal === "instructor") {
+      const authResponse = await handleInstructorAuth(
+        request,
+        internalPath,
+        host
+      );
+      if (authResponse.status >= 300 && authResponse.status < 400) {
+        return authResponse;
+      }
+
       if (
         !pathBelongsToPortal(internalPath, "instructor") &&
         !internalPath.startsWith("/register/")
@@ -191,6 +254,13 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith("/admin/") || pathname === PORTALS.admin.basePath) {
     return handleAdminAuth(request, pathname, host);
+  }
+
+  if (
+    pathname.startsWith("/instructor/") ||
+    pathname === PORTALS.instructor.basePath
+  ) {
+    return handleInstructorAuth(request, pathname, host);
   }
 
   return NextResponse.next();

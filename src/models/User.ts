@@ -15,6 +15,9 @@ export type UserDocument = {
   emailOtpHash?: string;
   emailOtpExpiresAt?: Date;
   dojoIds?: string[];
+  avatarUrl?: string;
+  avatarPublicId?: string;
+  bio?: string;
   appliedAt?: Date;
   approvedAt?: Date;
   approvedBy?: string;
@@ -40,6 +43,9 @@ const userSchema = new Schema({
     emailOtpHash: { type: String },
     emailOtpExpiresAt: { type: Date },
     dojoIds: { type: [String], default: [] },
+    avatarUrl: { type: String },
+    avatarPublicId: { type: String },
+    bio: { type: String, maxlength: 500 },
     appliedAt: { type: Date },
     approvedAt: { type: Date },
     approvedBy: { type: String },

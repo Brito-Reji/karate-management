@@ -9,7 +9,13 @@ import { matchesPortalPath } from '@/lib/portalRouting';
 import { usePortalHost } from '@/components/PortalHostProvider';
 import { usePortalPath } from '@/hooks/usePortalRouting';
 
-export default function AdminLayout({ children }) {
+const PUBLIC_PATHS = ['/login', '/register'];
+
+export default function InstructorPortalLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const pathname = usePathname();
@@ -17,28 +23,28 @@ export default function AdminLayout({ children }) {
   const queryClient = useQueryClient();
   const signingOutRef = useRef(false);
   const host = usePortalHost();
-  const loginPath = usePortalPath('admin', '/login');
-  const dojosPath = usePortalPath('admin', '/dojos');
-  const studentsPath = usePortalPath('admin', '/students');
-  const testsPath = usePortalPath('admin', '/tests');
-  const examDayPath = usePortalPath('admin', '/exam-day');
-  const applicationsPath = usePortalPath('admin', '/applications');
-  const staffPath = usePortalPath('admin', '/staff');
+  const loginPath = usePortalPath('instructor', '/login');
+  const dojosPath = usePortalPath('instructor', '/dojos');
+  const studentsPath = usePortalPath('instructor', '/students');
+  const profilePath = usePortalPath('instructor', '/profile');
+
+  const isPublicPage = PUBLIC_PATHS.some((segment) =>
+    matchesPortalPath(pathname, 'instructor', segment, host)
+  );
+
   const { data: currentUser, isError: meError } = useQuery({
     ...meQuery,
-    enabled: !matchesPortalPath(pathname, 'admin', '/login', host),
+    enabled: !isPublicPage,
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  // close drawer on navigation
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  // redirect blocked or expired sessions to login (clear cookie to avoid proxy redirect loop)
   useEffect(() => {
-    if (matchesPortalPath(pathname, 'admin', '/login', host) || !meError || signingOutRef.current) return;
+    if (isPublicPage || !meError || signingOutRef.current) return;
     signingOutRef.current = true;
 
     void (async () => {
@@ -49,14 +55,15 @@ export default function AdminLayout({ children }) {
         router.replace(loginPath);
       }
     })();
-  }, [meError, pathname, queryClient, router, loginPath, host]);
+  }, [meError, isPublicPage, pathname, queryClient, router, loginPath]);
 
-  // lock body scroll when drawer open
   useEffect(() => {
     if (!isMobileMenuOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [isMobileMenuOpen]);
 
   const handleLogout = async () => {
@@ -65,51 +72,55 @@ export default function AdminLayout({ children }) {
     router.push(loginPath);
   };
 
-  if (matchesPortalPath(pathname, 'admin', '/login', host)) {
+  if (isPublicPage) {
     return <>{children}</>;
   }
 
   const pageTitle =
-    matchesPortalPath(pathname, 'admin', '/students', host) ? 'Students' :
-    matchesPortalPath(pathname, 'admin', '/tests', host) ? 'Tests' :
-    matchesPortalPath(pathname, 'admin', '/exam-day', host) ? 'Exam Day' :
-    matchesPortalPath(pathname, 'admin', '/applications', host) ? 'Applications' :
-    matchesPortalPath(pathname, 'admin', '/staff', host) ? 'Staff' :
-    matchesPortalPath(pathname, 'admin', '/dojos', host) ? 'Dojos' :
-    'Dashboard';
+    matchesPortalPath(pathname, 'instructor', '/students', host)
+      ? 'Students'
+      : matchesPortalPath(pathname, 'instructor', '/profile', host)
+        ? 'Profile'
+      : matchesPortalPath(pathname, 'instructor', '/dojos', host)
+        ? 'My Dojos'
+        : 'Portal';
 
   const navItems = [
-    { label: 'Dojos', path: dojosPath, icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-    { label: 'Students', path: studentsPath, icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    ...(currentUser?.role === 'admin'
-      ? [{ label: 'Tests', path: testsPath, icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }]
-      : []),
-    ...(currentUser?.role === 'admin'
-      ? [{ label: 'Exam Day', path: examDayPath, icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }]
-      : []),
-    ...(currentUser?.role === 'admin'
-      ? [{ label: 'Applications', path: applicationsPath, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }]
-      : []),
-    ...(currentUser?.role === 'admin'
-      ? [{ label: 'Staff', path: staffPath, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' }]
-      : []),
+    {
+      label: 'My Dojos',
+      path: dojosPath,
+      icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    },
+    {
+      label: 'Students',
+      path: studentsPath,
+      icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+    },
+    {
+      label: 'Profile',
+      path: profilePath,
+      icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+    },
   ];
 
   return (
     <div className="h-screen min-h-[100dvh] bg-zinc-950 text-zinc-100 font-sans flex antialiased overflow-hidden">
-
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-64 bg-zinc-950 border-r border-white/[0.06] fixed inset-y-0 left-0 z-20 overflow-hidden">
         <div className="h-16 flex items-center px-6 border-b border-white/[0.06]">
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium tracking-tight text-zinc-200 truncate">Martins Academy</span>
-            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mt-0.5">Management Portal</span>
+            <span className="text-sm font-medium tracking-tight text-zinc-200 truncate">
+              Martins Academy
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 mt-0.5">
+              Instructor Portal
+            </span>
           </div>
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-hidden">
           {navItems.map((item) => {
-            const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+            const isActive =
+              pathname === item.path || pathname.startsWith(`${item.path}/`);
             return (
               <Link
                 key={item.label}
@@ -137,10 +148,24 @@ export default function AdminLayout({ children }) {
 
         <div className="p-4 border-t border-white/[0.06] bg-zinc-900/10">
           <div className="flex items-center justify-between gap-2 px-2">
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-zinc-300 truncate">{currentUser?.name || '—'}</span>
-              <span className="text-[10px] text-zinc-500 capitalize">{currentUser?.role || '—'}</span>
-            </div>
+            <Link href={profilePath} className="flex items-center gap-2 min-w-0 group">
+              <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center">
+                {currentUser?.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-medium text-zinc-500">
+                    {(currentUser?.name || '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-medium text-zinc-300 truncate group-hover:text-white transition-colors">
+                  {currentUser?.name || '—'}
+                </span>
+                <span className="text-[10px] text-zinc-500 capitalize">Instructor</span>
+              </div>
+            </Link>
             <button
               onClick={() => setShowLogoutConfirm(true)}
               title="Logout"
@@ -154,7 +179,6 @@ export default function AdminLayout({ children }) {
         </div>
       </aside>
 
-      {/* Mobile drawer overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
@@ -166,13 +190,18 @@ export default function AdminLayout({ children }) {
         className={`fixed top-0 bottom-0 left-0 w-[min(18rem,85vw)] max-w-xs bg-zinc-950 border-r border-white/[0.06] z-50 transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
       >
         <div className="h-14 sm:h-16 flex items-center justify-between px-5 border-b border-white/[0.06]">
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium tracking-tight text-zinc-200 truncate">Martins Academy</span>
-            <span className="text-[10px] text-zinc-500 capitalize truncate">
-              {currentUser?.name || 'Portal'} · {currentUser?.role || '—'}
+            <span className="text-sm font-medium tracking-tight text-zinc-200 truncate">
+              Martins Academy
+            </span>
+            <span className="text-[10px] text-zinc-500 truncate">
+              {currentUser?.name || 'Instructor Portal'}
             </span>
           </div>
           <button
@@ -187,7 +216,8 @@ export default function AdminLayout({ children }) {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+            const isActive =
+              pathname === item.path || pathname.startsWith(`${item.path}/`);
             return (
               <Link
                 key={item.label}
@@ -215,7 +245,10 @@ export default function AdminLayout({ children }) {
         </nav>
         <div className="p-3 border-t border-white/[0.06]">
           <button
-            onClick={() => { setShowLogoutConfirm(true); setIsMobileMenuOpen(false); }}
+            onClick={() => {
+              setShowLogoutConfirm(true);
+              setIsMobileMenuOpen(false);
+            }}
             className="flex items-center space-x-3 px-4 h-11 rounded-lg text-sm font-medium text-zinc-500 hover:text-red-400 hover:bg-red-950/10 transition-all w-full"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -226,7 +259,6 @@ export default function AdminLayout({ children }) {
         </div>
       </aside>
 
-      {/* Main workspace */}
       <div className="flex-1 flex flex-col min-w-0 h-screen min-h-[100dvh] lg:ml-64 overflow-hidden">
         <header
           className="h-14 sm:h-16 border-b border-white/[0.06] bg-zinc-950/90 backdrop-blur-md sticky top-0 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3 z-10"
@@ -252,26 +284,25 @@ export default function AdminLayout({ children }) {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Connected</span>
             </div>
-            <div className="sm:hidden flex items-center gap-1.5 text-[10px] text-zinc-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="capitalize truncate max-w-[7rem]">{currentUser?.role || ''}</span>
-            </div>
           </div>
         </header>
 
         <main className="flex-1 p-3 sm:p-6 lg:p-8 bg-zinc-950/40 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-7xl mx-auto w-full min-w-0">
-            {children}
-          </div>
+          <div className="max-w-7xl mx-auto w-full min-w-0">{children}</div>
         </main>
       </div>
 
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)} />
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowLogoutConfirm(false)}
+          />
           <div className="relative w-full sm:max-w-sm bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <h2 className="text-sm font-medium text-zinc-100">Sign out?</h2>
-            <p className="text-xs text-zinc-500 mt-1 mb-6">You will be redirected to the login page.</p>
+            <p className="text-xs text-zinc-500 mt-1 mb-6">
+              You will be redirected to the login page.
+            </p>
             <div className="flex items-center justify-end space-x-3">
               <button
                 onClick={() => setShowLogoutConfirm(false)}

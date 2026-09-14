@@ -1,7 +1,9 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Dojo from "@/models/Dojo";
+import ChangeRequest from "@/models/ChangeRequest";
 import { revalidateDojosCache } from "@/lib/cacheTags";
+import { applyApprovedChangeRequest, rejectChangeRequest } from "@/lib/changeRequests";
 import { requireAdmin } from "@/lib/requireAuth";
 import mongoose from "mongoose";
 import { type NextRequest, NextResponse } from "next/server";
@@ -24,13 +26,30 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
     await connectDB();
     const { id } = await params;
-    const { action, rejectionReason } = await request.json();
+    const { action, rejectionReason, kind } = await request.json();
 
     if (!["approve", "reject"].includes(action)) {
       return NextResponse.json(
         { success: false, message: "Action must be approve or reject" },
         { status: 400 }
       );
+    }
+
+    const resolvedKind =
+      kind === "change" || kind === "registration"
+        ? kind
+        : (await ChangeRequest.findById(id).select("_id").lean())
+          ? "change"
+          : "registration";
+
+    if (resolvedKind === "change") {
+      if (action === "approve") {
+        const updated = await applyApprovedChangeRequest(id, admin.userId);
+        return NextResponse.json({ success: true, request: updated });
+      }
+
+      const updated = await rejectChangeRequest(id, admin.userId, rejectionReason);
+      return NextResponse.json({ success: true, request: updated });
     }
 
     const target = await User.findById(id);
@@ -55,8 +74,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       target.approvedBy = admin.userId;
       target.rejectionReason = undefined;
 
-      const validDojoIds = (target.dojoIds || []).filter((id) =>
-        mongoose.Types.ObjectId.isValid(id)
+      const validDojoIds = (target.dojoIds || []).filter((dojoId) =>
+        mongoose.Types.ObjectId.isValid(dojoId)
       );
 
       if (validDojoIds.length > 0) {

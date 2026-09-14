@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/requireAuth";
-import { getCachedDojosWithCounts } from "@/lib/dojoQueriesServer";
+import {
+  getCachedDojosWithCounts,
+  queryInstructorDojosWithCounts,
+} from "@/lib/dojoQueriesServer";
 
 export async function GET(request) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   try {
@@ -14,7 +17,10 @@ export async function GET(request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const result = await getCachedDojosWithCounts(1, 20, query);
+    const result =
+      user.role === "instructor"
+        ? await queryInstructorDojosWithCounts(user.userId, 1, 20, query)
+        : await getCachedDojosWithCounts(1, 20, query);
 
     return NextResponse.json({
       success: true,

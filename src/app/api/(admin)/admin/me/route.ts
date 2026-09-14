@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const user = await User.findById(payload.userId)
-      .select("name role isBlocked")
+      .select("name role isBlocked avatarUrl email phone bio")
       .lean();
 
     if (!user || user.isBlocked) {
@@ -41,6 +41,10 @@ export async function GET(req: NextRequest) {
       userId: payload.userId,
       name: user.name,
       role: user.role,
+      avatarUrl: user.avatarUrl,
+      email: user.email,
+      phone: user.phone,
+      bio: user.bio,
     };
 
     const response = NextResponse.json({

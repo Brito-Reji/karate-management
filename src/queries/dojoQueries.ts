@@ -15,6 +15,7 @@ export type Dojo = {
   instructors?: string[];
   instructorIds?: string[];
   registeredInstructors?: RegisteredInstructor[];
+  imageUrl?: string;
   status?: "Active" | "Inactive";
   count?: number;
 };
