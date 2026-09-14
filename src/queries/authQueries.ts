@@ -2,6 +2,10 @@ export type AuthUser = {
   userId: string;
   name: string;
   role: string;
+  avatarUrl?: string;
+  email?: string;
+  phone?: string;
+  bio?: string;
 };
 
 export async function fetchMe(): Promise<AuthUser> {

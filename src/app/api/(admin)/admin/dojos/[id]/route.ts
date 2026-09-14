@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import Dojo from "@/models/Dojo";
 import connectDB from "@/lib/db";
-import { requireStaff } from "@/lib/requireAuth";
+import { requireAdmin } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { normalizeDojo } from "@/lib/dojoQueriesServer";
 import {
@@ -14,7 +14,7 @@ type RouteContext = {
 };
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
-  const { error } = await requireStaff();
+  const { error } = await requireAdmin();
   if (error) return error;
 
   try {

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PasswordInput from '@/components/PasswordInput';
+import ImageUploadField from '@/components/ImageUploadField';
 import { usePortalHref, usePortalPath } from '@/hooks/usePortalRouting';
 
 type DojoOption = {
@@ -16,7 +17,7 @@ type DojoOption = {
 export default function InstructorRegisterPage() {
   const router = useRouter();
   const verifyEmailPath = usePortalPath('instructor', '/register/verify-email');
-  const adminLoginHref = usePortalHref('admin', '/login');
+  const loginHref = usePortalHref('instructor', '/login');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -25,6 +26,8 @@ export default function InstructorRegisterPage() {
     confirmPassword: '',
   });
   const [selectedDojoIds, setSelectedDojoIds] = useState<string[]>([]);
+  const [avatar, setAvatar] = useState<{ url: string; publicId?: string } | null>(null);
+  const [bio, setBio] = useState('');
   const [dojoSearch, setDojoSearch] = useState('');
   const [dojos, setDojos] = useState<DojoOption[]>([]);
   const [loadingDojos, setLoadingDojos] = useState(true);
@@ -98,6 +101,9 @@ export default function InstructorRegisterPage() {
         body: JSON.stringify({
           ...formData,
           dojoIds: selectedDojoIds,
+          avatarUrl: avatar?.url,
+          avatarPublicId: avatar?.publicId,
+          bio: bio.trim() || undefined,
         }),
       });
 
@@ -143,6 +149,17 @@ export default function InstructorRegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <ImageUploadField
+              label="Profile photo (optional)"
+              folder="karate/instructors"
+              signEndpoint="/api/register/instructor/cloudinary-sign"
+              value={avatar}
+              onChange={(result) =>
+                setAvatar(result ? { url: result.secureUrl, publicId: result.publicId } : null)
+              }
+              disabled={loading}
+            />
+
             <div className="space-y-1.5">
               <label htmlFor="name" className="text-xs font-medium text-zinc-400 tracking-wide">
                 Full Name
@@ -191,6 +208,22 @@ export default function InstructorRegisterPage() {
                 onChange={handleChange}
                 placeholder="you@example.com"
                 className="w-full h-11 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="bio" className="text-xs font-medium text-zinc-400 tracking-wide">
+                Bio (optional)
+              </label>
+              <textarea
+                id="bio"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                disabled={loading}
+                rows={3}
+                maxLength={500}
+                placeholder="Brief intro for admin review…"
+                className="w-full px-4 py-3 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-50 resize-none"
               />
             </div>
 
@@ -332,7 +365,7 @@ export default function InstructorRegisterPage() {
 
           <p className="text-center text-xs text-zinc-500 mt-6">
             Already have an account?{' '}
-            <Link href={adminLoginHref} className="text-zinc-300 hover:text-white transition-colors">
+            <Link href={loginHref} className="text-zinc-300 hover:text-white transition-colors">
               Sign in
             </Link>
           </p>

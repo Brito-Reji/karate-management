@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     await connectDB();
-    const { name, email, phone, password, confirmPassword, dojoIds } =
+    const { name, email, phone, password, confirmPassword, dojoIds, avatarUrl, avatarPublicId, bio } =
       await request.json();
 
     if (!name?.trim()) {
@@ -100,6 +100,11 @@ export async function POST(request: Request) {
       existing.emailOtpHash = otpHash;
       existing.emailOtpExpiresAt = otpExpiresAt;
       existing.appliedAt = new Date();
+      if (avatarUrl) {
+        existing.avatarUrl = avatarUrl.trim();
+        existing.avatarPublicId = avatarPublicId?.trim();
+      }
+      if (typeof bio === "string") existing.bio = bio.trim().slice(0, 500);
       await existing.save();
 
       await sendInstructorOtpEmail(normalizedEmail, otp, name.trim());
@@ -133,6 +138,9 @@ export async function POST(request: Request) {
       emailOtpExpiresAt: otpExpiresAt,
       dojoIds,
       appliedAt: new Date(),
+      avatarUrl: avatarUrl?.trim() || undefined,
+      avatarPublicId: avatarPublicId?.trim() || undefined,
+      bio: bio?.trim()?.slice(0, 500) || undefined,
     });
 
     await sendInstructorOtpEmail(normalizedEmail, otp, name.trim());

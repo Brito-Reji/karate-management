@@ -1,7 +1,7 @@
 import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
-import { requireStaff, canAccessStudent, isDuplicateKeyError } from "@/lib/requireAuth";
+import { requireStaff, canAccessStudent, assertInstructorCanUseDojo, isDuplicateKeyError } from "@/lib/requireAuth";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { resequenceStudentIds } from "@/lib/resequenceStudentIds";
 import { NextResponse } from "next/server";
@@ -20,7 +20,7 @@ export async function GET(request, { params }) {
         { status: 404 }
       );
     }
-    if (!canAccessStudent(user, student)) {
+    if (!(await canAccessStudent(user, student))) {
       return NextResponse.json(
         { success: false, message: "Forbidden" },
         { status: 403 }
@@ -64,10 +64,18 @@ export async function PUT(request, { params }) {
         { status: 404 }
       );
     }
-    if (!canAccessStudent(user, existing)) {
+    if (!(await canAccessStudent(user, existing))) {
       return NextResponse.json(
         { success: false, message: "Forbidden" },
         { status: 403 }
+      );
+    }
+
+    const dojoCheck = await assertInstructorCanUseDojo(user, dojoId);
+    if (dojoCheck.ok === false) {
+      return NextResponse.json(
+        { success: false, message: dojoCheck.message },
+        { status: user.role === "instructor" ? 403 : 400 }
       );
     }
 
@@ -116,14 +124,14 @@ export async function DELETE(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const existing = await Student.findById(id).select("createdBy").lean();
+    const existing = await Student.findById(id).select("createdBy dojoId").lean();
     if (!existing) {
       return NextResponse.json(
         { success: false, message: "Student not found" },
         { status: 404 }
       );
     }
-    if (!canAccessStudent(user, existing)) {
+    if (!(await canAccessStudent(user, existing))) {
       return NextResponse.json(
         { success: false, message: "Forbidden" },
         { status: 403 }
