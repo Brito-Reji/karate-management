@@ -9,6 +9,7 @@ export type DojoDocument = {
   instructors?: string[];
   instructor?: string;
   instructorIds?: mongoose.Types.ObjectId[];
+  mainInstructor?: string | null;
   imageUrl?: string;
   imagePublicId?: string;
 };
@@ -42,6 +43,11 @@ const dojoSchema = new mongoose.Schema(
     instructorIds: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
+    },
+    mainInstructor: {
+      type: String,
+      trim: true,
+      default: null,
     },
     imageUrl: { type: String },
     imagePublicId: { type: String },

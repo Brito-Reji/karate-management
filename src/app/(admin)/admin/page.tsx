@@ -42,6 +42,15 @@ export default function AdminDashboard() {
     ...(role === 'admin'
       ? [
           {
+            label: 'Commissions',
+            desc: 'Track test fees, instructor commission, and academy profit.',
+            href: '/admin/commissions',
+          },
+        ]
+      : []),
+    ...(role === 'admin'
+      ? [
+          {
             label: 'Staff',
             desc: 'Add admins and instructors who can manage the portal.',
             href: '/admin/staff',

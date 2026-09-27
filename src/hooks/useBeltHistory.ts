@@ -51,6 +51,7 @@ export function usePromoteStudent() {
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.id) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
       qc.invalidateQueries({ queryKey: ['examDay'] });
+      qc.invalidateQueries({ queryKey: queryKeys.commissions.all() });
     },
   });
 }
@@ -67,6 +68,7 @@ export function useUpdateBeltHistory() {
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
       qc.invalidateQueries({ queryKey: ['examDay'] });
+      qc.invalidateQueries({ queryKey: queryKeys.commissions.all() });
     },
   });
 }
@@ -82,6 +84,7 @@ export function useDeleteBeltHistory() {
       qc.invalidateQueries({ queryKey: queryKeys.students.beltHistory(vars.studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
       qc.invalidateQueries({ queryKey: ['examDay'] });
+      qc.invalidateQueries({ queryKey: queryKeys.commissions.all() });
     },
   });
 }

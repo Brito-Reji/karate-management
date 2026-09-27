@@ -7,6 +7,7 @@ import { normalizeDojo } from "@/lib/dojoQueriesServer";
 import {
   validateInstructorIds,
   syncUserDojoIdsForInstructors,
+  pickMainInstructor,
 } from "@/lib/dojoInstructors";
 
 type RouteContext = {
@@ -20,11 +21,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     await connectDB();
 
-    const { name, location, instructor, instructors, instructorIds } =
+    const { name, location, instructor, instructors, instructorIds, mainInstructor } =
       await request.json();
     const { id } = await params;
 
-    const existing = await Dojo.findById(id).select("instructorIds").lean();
+    const existing = await Dojo.findById(id)
+      .select("instructorIds mainInstructor")
+      .lean();
     if (!existing) {
       return NextResponse.json(
         { success: false, message: "Dojo not found" },
@@ -55,6 +58,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       nextIds = validatedInstructorIds.map(String);
     }
 
+    const rawMain =
+      mainInstructor !== undefined ? mainInstructor : existing.mainInstructor ?? null;
+    updatePayload.mainInstructor = pickMainInstructor(rawMain, finalInstructors);
+
     const dojo = await Dojo.findByIdAndUpdate(id, updatePayload, {
       new: true,
       runValidators: true,
@@ -81,7 +88,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const message =
       error instanceof Error ? error.message : "Failed to update dojo";
     const isValidation =
-      message.includes("invalid") || message.includes("not approved");
+      message.includes("invalid") ||
+      message.includes("not approved") ||
+      message.toLowerCase().includes("main instructor");
     return NextResponse.json(
       { success: false, message: isValidation ? message : "Failed to update dojo" },
       { status: isValidation ? 400 : 500 }

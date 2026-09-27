@@ -4,7 +4,7 @@ import Dojo from "@/models/Dojo";
 import User from "@/models/User";
 import { attachDojoStudentCounts } from "@/lib/dojoStudentCounts";
 import { CACHE_TAGS } from "@/lib/cacheTags";
-import { prefixRegex } from "@/lib/mongoSearch";
+import { escapeRegex, prefixRegex } from "@/lib/mongoSearch";
 import { getAssignedDojoIds } from "@/lib/instructorDojos";
 
 export type RegisteredInstructor = {
@@ -21,6 +21,7 @@ export type DojoListItem = {
   instructors: string[];
   instructorIds: string[];
   registeredInstructors: RegisteredInstructor[];
+  mainInstructor: string | null;
   imageUrl?: string;
   count?: number;
 };
@@ -103,31 +104,65 @@ export function normalizeDojo(
       : (dojo.instructorIds as unknown[]).map(String)
     : [];
 
-  const { instructorIds: _rawIds, ...rest } = dojo;
+  const { instructorIds: _rawIds, mainInstructor: rawMain, ...rest } = dojo;
+  const mainName = typeof rawMain === "string" ? rawMain.trim() : "";
 
   return {
     ...(rest as Omit<
       DojoListItem,
-      "_id" | "instructors" | "instructorIds" | "registeredInstructors"
+      | "_id"
+      | "instructors"
+      | "instructorIds"
+      | "registeredInstructors"
+      | "mainInstructor"
     >),
     _id: String(dojo._id),
     instructors,
     instructorIds,
     registeredInstructors,
+    mainInstructor: instructors.includes(mainName) ? mainName : null,
   };
 }
 
 export async function getDojoIdsForInstructor(instructor: string): Promise<string[]> {
   await connectDB();
+  const trimmed = instructor.trim();
+  if (!trimmed) return [];
+
+  const ids = new Set<string>();
+
+  const matchingUsers = await User.find({
+    role: "instructor",
+    name: { $regex: `^${escapeRegex(trimmed)}$`, $options: "i" },
+    isBlocked: { $ne: true },
+  })
+    .select("_id")
+    .lean();
+
+  const userObjectIds = matchingUsers.map((u) => u._id);
+  if (userObjectIds.length > 0) {
+    const linkedDojos = await Dojo.find({
+      instructorIds: { $in: userObjectIds },
+    })
+      .select("_id dojoId")
+      .lean();
+
+    for (const dojo of linkedDojos) {
+      ids.add(String(dojo._id));
+      if (dojo.dojoId) ids.add(String(dojo.dojoId));
+    }
+  }
+
   const dojos = await Dojo.find({})
     .select("_id dojoId instructor instructors")
     .lean();
 
-  const ids = new Set<string>();
-
   for (const dojo of dojos) {
     const normalized = normalizeDojo(dojo as Record<string, unknown>);
-    if (!normalized.instructors.includes(instructor)) continue;
+    const onList = normalized.instructors.some(
+      (name) => name.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!onList) continue;
 
     ids.add(normalized._id);
     if (normalized.dojoId) ids.add(normalized.dojoId);
@@ -198,7 +233,7 @@ export async function queryDojosWithCounts(page: number, limit: number, search: 
 
   const [dojos, total] = await Promise.all([
     Dojo.find(filter)
-      .select("_id dojoId name location instructor instructors instructorIds imageUrl createdAt")
+      .select("_id dojoId name location instructor instructors instructorIds mainInstructor imageUrl createdAt")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
@@ -239,12 +274,13 @@ export type DojoDropdownOption = {
   instructors: string[];
   instructorIds: string[];
   registeredInstructors: RegisteredInstructor[];
+  mainInstructor: string | null;
 };
 
 export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
   await connectDB();
   const dojos = await Dojo.find({})
-    .select("_id dojoId name location instructor instructors instructorIds imageUrl")
+      .select("_id dojoId name location instructor instructors instructorIds mainInstructor imageUrl")
     .sort({ location: 1 })
     .lean();
 
@@ -266,6 +302,7 @@ export async function queryDojoOptions(): Promise<DojoDropdownOption[]> {
       instructors: normalized.instructors,
       instructorIds: normalized.instructorIds,
       registeredInstructors: normalized.registeredInstructors,
+      mainInstructor: normalized.mainInstructor,
     };
   });
 }
@@ -297,7 +334,7 @@ export async function queryInstructorDojosWithCounts(
 
   const [dojos, total] = await Promise.all([
     Dojo.find(filter)
-      .select("_id dojoId name location instructor instructors instructorIds imageUrl createdAt")
+      .select("_id dojoId name location instructor instructors instructorIds mainInstructor imageUrl createdAt")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 })
@@ -329,7 +366,7 @@ export async function queryInstructorDojoOptions(
   if (assignedIds.length === 0) return [];
 
   const dojos = await Dojo.find({ _id: { $in: assignedIds } })
-    .select("_id dojoId name location instructor instructors instructorIds imageUrl")
+      .select("_id dojoId name location instructor instructors instructorIds mainInstructor imageUrl")
     .sort({ location: 1 })
     .lean();
 
@@ -351,6 +388,7 @@ export async function queryInstructorDojoOptions(
       instructors: normalized.instructors,
       instructorIds: normalized.instructorIds,
       registeredInstructors: normalized.registeredInstructors,
+      mainInstructor: normalized.mainInstructor,
     };
   });
 }

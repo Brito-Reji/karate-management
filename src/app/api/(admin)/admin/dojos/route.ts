@@ -7,6 +7,7 @@ import { getCachedDojosWithCounts, queryInstructorDojosWithCounts } from "@/lib/
 import {
   validateInstructorIds,
   syncUserDojoIdsForInstructors,
+  pickMainInstructor,
 } from "@/lib/dojoInstructors";
 
 export async function POST(request) {
@@ -16,7 +17,7 @@ export async function POST(request) {
   try {
     await connectDB();
 
-    const { name, location, instructor, instructors, instructorIds } =
+    const { name, location, instructor, instructors, instructorIds, mainInstructor } =
       await request.json();
 
     const count = await Dojo.countDocuments();
@@ -30,6 +31,7 @@ export async function POST(request) {
 
     const finalInstructor = finalInstructors.join(", ");
     const validatedInstructorIds = await validateInstructorIds(instructorIds);
+    const validatedMainInstructor = pickMainInstructor(mainInstructor, finalInstructors);
 
     const dojo = await Dojo.create({
       name,
@@ -37,6 +39,7 @@ export async function POST(request) {
       instructor: finalInstructor,
       instructors: finalInstructors,
       instructorIds: validatedInstructorIds,
+      mainInstructor: validatedMainInstructor,
       dojoId,
     });
 
@@ -58,7 +61,9 @@ export async function POST(request) {
     const message =
       error instanceof Error ? error.message : "Failed to create dojo";
     const isValidation =
-      message.includes("invalid") || message.includes("not approved");
+      message.includes("invalid") ||
+      message.includes("not approved") ||
+      message.toLowerCase().includes("main instructor");
     return NextResponse.json(
       {
         success: false,

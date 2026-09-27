@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
-  throw new Error("MONGO_URI is missing in .env.local");
+  throw new Error("MONGO_URI is missing in .env (or .env.local)");
 }
 
 const mongoUri: string = MONGO_URI;
@@ -35,6 +35,10 @@ async function connectDB() {
 
   try {
     cached.conn = await cached.promise;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("DB connected");
+    }
   } catch (error) {
     cached.promise = null;
     throw error;

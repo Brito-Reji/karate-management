@@ -11,6 +11,7 @@ import User from "@/models/User";
 import { deleteCloudinaryAsset } from "@/lib/cloudinary";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { isDojoAssignedToInstructor } from "@/lib/instructorDojos";
+import { linkApprovedInstructorToDojos } from "@/lib/dojoInstructors";
 
 function profileSnapshot(user: {
   name?: string;
@@ -202,13 +203,13 @@ export async function applyApprovedChangeRequest(
       throw new Error("Invalid dojo");
     }
 
-    await Dojo.updateOne(
-      { _id: targetId },
-      { $addToSet: { instructorIds: instructorId } }
-    );
-    await User.updateOne(
-      { _id: instructorId },
-      { $addToSet: { dojoIds: targetId } }
+    const instructor = await User.findById(instructorId).select("name").lean();
+    if (!instructor) throw new Error("Instructor not found");
+
+    await linkApprovedInstructorToDojos(
+      instructorId,
+      [targetId],
+      instructor.name ?? ""
     );
     revalidateDojosCache();
   }

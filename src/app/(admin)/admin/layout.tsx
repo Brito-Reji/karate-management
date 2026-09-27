@@ -24,6 +24,7 @@ export default function AdminLayout({ children }) {
   const examDayPath = usePortalPath('admin', '/exam-day');
   const applicationsPath = usePortalPath('admin', '/applications');
   const staffPath = usePortalPath('admin', '/staff');
+  const commissionsPath = usePortalPath('admin', '/commissions');
   const { data: currentUser, isError: meError } = useQuery({
     ...meQuery,
     enabled: !matchesPortalPath(pathname, 'admin', '/login', host),
@@ -73,6 +74,7 @@ export default function AdminLayout({ children }) {
     matchesPortalPath(pathname, 'admin', '/students', host) ? 'Students' :
     matchesPortalPath(pathname, 'admin', '/tests', host) ? 'Tests' :
     matchesPortalPath(pathname, 'admin', '/exam-day', host) ? 'Exam Day' :
+    matchesPortalPath(pathname, 'admin', '/commissions', host) ? 'Commissions' :
     matchesPortalPath(pathname, 'admin', '/applications', host) ? 'Applications' :
     matchesPortalPath(pathname, 'admin', '/staff', host) ? 'Staff' :
     matchesPortalPath(pathname, 'admin', '/dojos', host) ? 'Dojos' :
@@ -86,6 +88,9 @@ export default function AdminLayout({ children }) {
       : []),
     ...(currentUser?.role === 'admin'
       ? [{ label: 'Exam Day', path: examDayPath, icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' }]
+      : []),
+    ...(currentUser?.role === 'admin'
+      ? [{ label: 'Commissions', path: commissionsPath, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }]
       : []),
     ...(currentUser?.role === 'admin'
       ? [{ label: 'Applications', path: applicationsPath, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }]
