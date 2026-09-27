@@ -1,13 +1,10 @@
 'use client';
 
-import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import CommissionsSubnav from '@/components/commissions/CommissionsSubnav';
-import {
-  useAssignTestInstructor,
-  useCommissionDashboard,
-} from '@/hooks/useCommissions';
+import { useCommissionDashboard } from '@/hooks/useCommissions';
 import { useAllDojos } from '@/hooks/useBeltHistory';
 import { getTodayDateString } from '@/lib/examDayDates';
 import { formatInr } from '@/queries/commissionQueries';
@@ -78,28 +75,21 @@ function CommissionsContent() {
   const toDate = searchParams.get('to') || defaults.to;
   const allDates = searchParams.get('all') === '1';
   const selectedDojoId = searchParams.get('dojoId') || '';
-  const selectedInstructorId = searchParams.get('instructorId') || '';
+  const selectedInstructor = searchParams.get('instructor') || '';
   const selectedStatus = (searchParams.get('status') as 'Pass' | 'Fail' | null) || '';
-  const assignment =
-    searchParams.get('assignment') === 'unassigned' ||
-    searchParams.get('assignment') === 'assigned'
-      ? (searchParams.get('assignment') as 'unassigned' | 'assigned')
-      : 'all';
   const sort = searchParams.get('sort') || 'awardedDate';
   const order = searchParams.get('order') === 'asc' ? 'asc' : 'desc';
   const LIMIT = 50;
 
   const { data: dojos = [] } = useAllDojos();
-  const assignMutation = useAssignTestInstructor();
 
   const { data, isLoading, isFetching } = useCommissionDashboard(currentPage, LIMIT, {
     from: allDates ? undefined : fromDate,
     to: allDates ? undefined : toDate,
     all: allDates,
     dojoId: selectedDojoId,
-    instructorId: selectedInstructorId,
+    instructor: selectedInstructor,
     status: selectedStatus,
-    assignment,
     sort,
     order,
   });
@@ -109,33 +99,14 @@ function CommissionsContent() {
   const byInstructor = data?.byInstructor ?? [];
   const totalPages = data?.totalPages ?? 1;
 
-  const [assignModal, setAssignModal] = useState<{
-    testId: string;
-    studentName: string;
-    dojoId: string | null;
-  } | null>(null);
-  const [selectedAssignInstructor, setSelectedAssignInstructor] = useState('');
-  const [assignError, setAssignError] = useState('');
-
   const instructorOptions = useMemo(() => {
-    const map = new Map<string, string>();
+    const names = new Set<string>();
     for (const dojo of dojos) {
-      for (const inst of dojo.registeredInstructors ?? []) {
-        map.set(inst._id, inst.name);
-      }
+      const name = dojo.mainInstructor?.trim();
+      if (name) names.add(name);
     }
-    return [...map.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return [...names].sort((a, b) => a.localeCompare(b));
   }, [dojos]);
-
-  const assignCandidates = useMemo(() => {
-    if (!assignModal?.dojoId) return [];
-    const dojo = dojos.find(
-      (d) => d.dojoId === assignModal.dojoId || d._id === assignModal.dojoId
-    );
-    return dojo?.registeredInstructors ?? [];
-  }, [assignModal, dojos]);
 
   const setParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -165,21 +136,6 @@ function CommissionsContent() {
     }
   };
 
-  const handleAssign = () => {
-    if (!assignModal || !selectedAssignInstructor) return;
-    setAssignError('');
-    assignMutation.mutate(
-      { testId: assignModal.testId, instructorId: selectedAssignInstructor },
-      {
-        onSuccess: () => {
-          setAssignModal(null);
-          setSelectedAssignInstructor('');
-        },
-        onError: (err) => setAssignError(err.message),
-      }
-    );
-  };
-
   return (
     <div className="space-y-5 sm:space-y-6 animate-fadeIn">
       <div className="flex flex-col gap-4 border-b border-white/[0.04] pb-6">
@@ -187,7 +143,7 @@ function CommissionsContent() {
           <div>
             <h1 className="text-xl font-light tracking-tight text-zinc-100">Commissions</h1>
             <p className="text-xs text-zinc-500 mt-1">
-              Test fees, instructor commission, and academy profit for every belt test.
+              Test fees and commission for each dojo&apos;s main instructor.
             </p>
           </div>
           <Link
@@ -230,27 +186,28 @@ function CommissionsContent() {
               className="w-full h-10 px-3 bg-zinc-900/50 border border-white/[0.06] rounded-lg text-sm text-zinc-200"
             >
               <option value="">All dojos</option>
-              {dojos.map((d) => (
-                <option key={d._id} value={d.dojoId || d._id}>
-                  {d.name} — {d.location}
-                </option>
-              ))}
+              {dojos
+                .filter((d) => d.dojoId)
+                .map((d) => (
+                  <option key={d.dojoId} value={d.dojoId}>
+                    {d.name} — {d.location}
+                  </option>
+                ))}
             </select>
           </label>
           <label className="space-y-1.5 sm:col-span-2 lg:col-span-1">
             <span className="text-[10px] uppercase tracking-widest text-zinc-500">Instructor</span>
             <select
-              value={selectedInstructorId}
-              disabled={assignment === 'unassigned'}
+              value={selectedInstructor}
               onChange={(e) =>
-                setParams({ instructorId: e.target.value || null, page: null })
+                setParams({ instructor: e.target.value || null, page: null })
               }
-              className="w-full h-10 px-3 bg-zinc-900/50 border border-white/[0.06] rounded-lg text-sm text-zinc-200 disabled:opacity-40"
+              className="w-full h-10 px-3 bg-zinc-900/50 border border-white/[0.06] rounded-lg text-sm text-zinc-200"
             >
-              <option value="">All instructors</option>
-              {instructorOptions.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
+              <option value="">All main instructors</option>
+              {instructorOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -270,32 +227,6 @@ function CommissionsContent() {
               }`}
             >
               {s || 'All outcomes'}
-            </button>
-          ))}
-          {(
-            [
-              ['all', 'All tests'],
-              ['assigned', 'Assigned'],
-              ['unassigned', 'Needs instructor'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() =>
-                setParams({
-                  assignment: value === 'all' ? null : value,
-                  instructorId: value === 'unassigned' ? null : selectedInstructorId || null,
-                  page: null,
-                })
-              }
-              className={`px-3 py-1.5 rounded-lg text-xs border ${
-                assignment === value
-                  ? 'bg-white/[0.06] border-white/[0.10] text-zinc-100'
-                  : 'bg-white/[0.02] border-white/[0.06] text-zinc-500'
-              }`}
-            >
-              {label}
             </button>
           ))}
           <button
@@ -321,7 +252,7 @@ function CommissionsContent() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <SummaryCard label="Tests conducted" value={summary?.tests ?? 0} />
-          <SummaryCard label="Total fees" value={formatInr(summary?.fees ?? 0)} sub="Assigned instructors only" />
+          <SummaryCard label="Total fees" value={formatInr(summary?.fees ?? 0)} />
           <SummaryCard
             label="Commission owed"
             value={formatInr(summary?.commission ?? 0)}
@@ -336,17 +267,14 @@ function CommissionsContent() {
             }
           />
           <SummaryCard
-            label="Needs instructor"
-            value={summary?.unassigned.tests ?? 0}
+            label="No main instructor"
+            value={summary?.noMainInstructor.tests ?? 0}
             sub={
-              summary?.unassigned.tests
-                ? `${formatInr(summary.unassigned.commission)} commission pending assignment`
-                : 'All tests assigned'
+              summary?.noMainInstructor.tests
+                ? `${formatInr(summary.noMainInstructor.commission)} not owed until a dojo has a main instructor`
+                : 'Every dojo in this range has a main instructor'
             }
             accent="warn"
-            onClick={() =>
-              setParams({ assignment: 'unassigned', instructorId: null, page: null })
-            }
           />
         </div>
       )}
@@ -379,12 +307,12 @@ function CommissionsContent() {
               {byInstructor.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-zinc-500 text-xs">
-                    No assigned instructor data for this filter.
+                    No main-instructor commission for this filter.
                   </td>
                 </tr>
               ) : (
                 byInstructor.map((row) => (
-                  <tr key={`${row.instructorId}:${row.dojoId}`} className="border-b border-white/[0.04]">
+                  <tr key={`${row.instructorName}:${row.dojoId}`} className="border-b border-white/[0.04]">
                     <td className="px-4 py-3 text-zinc-200">{row.instructorName || '—'}</td>
                     <td className="px-4 py-3 text-zinc-400">{row.dojoName || row.dojoId || '—'}</td>
                     <td className="px-4 py-3 text-zinc-300 tabular-nums">{row.tests}</td>
@@ -448,13 +376,12 @@ function CommissionsContent() {
                         Profit
                       </button>
                     </th>
-                    <th className="px-4 py-3 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {entries.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-zinc-500 text-xs">
+                      <td colSpan={8} className="px-4 py-10 text-center text-zinc-500 text-xs">
                         No tests match this filter.
                       </td>
                     </tr>
@@ -472,7 +399,7 @@ function CommissionsContent() {
                         <td className="px-4 py-3 text-zinc-400 text-xs">{entry.dojoName ?? '—'}</td>
                         <td className="px-4 py-3 text-zinc-300 text-xs">
                           {entry.instructorName ?? (
-                            <span className="text-amber-200/90">Unassigned</span>
+                            <span className="text-amber-200/90">No main instructor</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-zinc-400 text-xs whitespace-nowrap">
@@ -492,25 +419,6 @@ function CommissionsContent() {
                           ) : (
                             '—'
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {!entry.instructorId ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAssignError('');
-                                setSelectedAssignInstructor('');
-                                setAssignModal({
-                                  testId: entry._id,
-                                  studentName: entry.student?.name ?? 'Student',
-                                  dojoId: entry.dojoId,
-                                });
-                              }}
-                              className="text-xs text-zinc-300 hover:text-white underline"
-                            >
-                              Assign
-                            </button>
-                          ) : null}
                         </td>
                       </tr>
                     ))
@@ -546,50 +454,6 @@ function CommissionsContent() {
         )}
       </div>
 
-      {assignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-          <div className="w-full max-w-md bg-zinc-950 border border-white/[0.08] rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-medium text-zinc-100">Assign instructor</h3>
-            <p className="text-xs text-zinc-500">
-              Test for {assignModal.studentName}. Choose from this student&apos;s dojo instructors.
-            </p>
-            {assignCandidates.length === 0 ? (
-              <p className="text-xs text-amber-200">No registered instructors on this dojo.</p>
-            ) : (
-              <select
-                value={selectedAssignInstructor}
-                onChange={(e) => setSelectedAssignInstructor(e.target.value)}
-                className="w-full h-10 px-3 bg-zinc-900 border border-white/[0.06] rounded-lg text-sm text-zinc-200"
-              >
-                <option value="">Select instructor</option>
-                {assignCandidates.map((i) => (
-                  <option key={i._id} value={i._id}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {assignError ? <p className="text-xs text-red-400">{assignError}</p> : null}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setAssignModal(null)}
-                className="px-4 h-9 text-xs text-zinc-400"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!selectedAssignInstructor || assignMutation.isPending}
-                onClick={handleAssign}
-                className="px-4 h-9 bg-zinc-100 text-zinc-950 text-xs font-medium rounded-lg disabled:opacity-40"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

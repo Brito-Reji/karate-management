@@ -1,14 +1,11 @@
-import mongoose from "mongoose";
 import BeltProgression from "@/models/BeltProgression";
 import Dojo from "@/models/Dojo";
 import Student from "@/models/Student";
 import TestFeeSetting from "@/models/TestFeeSetting";
-import User from "@/models/User";
 import { BELTS } from "@/lib/constants";
 import { enrichEntriesWithFromBelt } from "@/lib/beltHistory";
 import connectDB from "@/lib/db";
 import { getTodayDateString, parseExamDayRange } from "@/lib/examDayDates";
-import { escapeRegex } from "@/lib/mongoSearch";
 
 export type FeeSettingMap = Map<
   string,
@@ -108,103 +105,40 @@ export function computeMoneyForBelt(
   };
 }
 
-/** Commission recipient for tests at a student's dojo. */
-export async function resolveDojoMainInstructor(
-  studentDojoId: string | undefined | null
-): Promise<{ id: mongoose.Types.ObjectId; name: string } | null> {
-  if (!studentDojoId?.trim()) return null;
+type DojoCommissionInfo = {
+  dojoId: string;
+  mongoId: string;
+  name: string;
+  mainInstructor: string | null;
+};
 
-  const dojo = await Dojo.findOne({
-    $or: [
-      { dojoId: studentDojoId },
-      ...(mongoose.Types.ObjectId.isValid(studentDojoId)
-        ? [{ _id: studentDojoId }]
-        : []),
-    ],
-  })
-    .select("mainInstructor instructorIds")
-    .lean();
-
-  const mainName = dojo?.mainInstructor?.trim();
-  if (!mainName) return null;
-
-  const linked = new Set((dojo?.instructorIds ?? []).map(String));
-  const linkedObjectIds = [...linked].filter((id) =>
-    mongoose.Types.ObjectId.isValid(id)
-  );
-
-  if (linkedObjectIds.length > 0) {
-    const linkedUsers = await User.find({
-      _id: { $in: linkedObjectIds },
-      role: "instructor",
-      isBlocked: { $ne: true },
-    })
-      .select("name")
-      .lean();
-
-    const onDojo = linkedUsers.find(
-      (user) =>
-        user.name?.trim().toLowerCase() === mainName.toLowerCase()
-    );
-    if (onDojo) {
-      return {
-        id: onDojo._id as mongoose.Types.ObjectId,
-        name: onDojo.name,
-      };
-    }
-  }
-
-  const users = await User.find({
-    role: "instructor",
-    name: { $regex: `^${escapeRegex(mainName)}$`, $options: "i" },
-    isBlocked: { $ne: true },
-  })
-    .select("name")
-    .lean();
-
-  if (users.length === 0) return null;
-
-  const preferred =
-    users.find((user) => linked.has(String(user._id))) ?? users[0];
-
-  return { id: preferred._id as mongoose.Types.ObjectId, name: preferred.name };
+function studentDojoKeys(info: DojoCommissionInfo): string[] {
+  return [...new Set([info.dojoId, info.mongoId].filter(Boolean))];
 }
 
-export async function assertInstructorOnStudentDojo(
-  studentDojoId: string | undefined | null,
-  instructorId: string
-): Promise<{ ok: true; instructorName: string } | { ok: false; message: string }> {
-  if (!studentDojoId?.trim()) {
-    return { ok: false, message: "Student has no dojo assigned" };
-  }
-  if (!mongoose.Types.ObjectId.isValid(instructorId)) {
-    return { ok: false, message: "Invalid instructor id" };
-  }
+/** Index dojos by both the public dojo code and the stored student link. */
+async function loadDojoCommissionIndex(): Promise<Map<string, DojoCommissionInfo>> {
+  const dojos = await Dojo.find({}).select("dojoId name mainInstructor").lean();
+  const byKey = new Map<string, DojoCommissionInfo>();
 
-  const dojo = await Dojo.findOne({
-    $or: [{ dojoId: studentDojoId }, { _id: studentDojoId }],
-  })
-    .select("instructorIds")
-    .lean();
-
-  if (!dojo) {
-    return { ok: false, message: "Dojo not found for student" };
-  }
-
-  const allowed = (dojo.instructorIds ?? []).map(String);
-  if (!allowed.includes(String(instructorId))) {
-    return {
-      ok: false,
-      message: "Instructor is not assigned to this student's dojo",
+  for (const dojo of dojos) {
+    const info: DojoCommissionInfo = {
+      dojoId: dojo.dojoId,
+      mongoId: String(dojo._id),
+      name: dojo.name,
+      mainInstructor: dojo.mainInstructor?.trim() || null,
     };
+    if (info.dojoId) byKey.set(info.dojoId, info);
+    byKey.set(info.mongoId, info);
   }
 
-  const user = await User.findById(instructorId).select("name role").lean();
-  if (!user || user.role !== "instructor") {
-    return { ok: false, message: "Instructor not found" };
-  }
+  return byKey;
+}
 
-  return { ok: true, instructorName: user.name };
+function uniqueDojos(index: Map<string, DojoCommissionInfo>): DojoCommissionInfo[] {
+  const byMongoId = new Map<string, DojoCommissionInfo>();
+  for (const info of index.values()) byMongoId.set(info.mongoId, info);
+  return [...byMongoId.values()];
 }
 
 type PopulatedStudent = {
@@ -219,15 +153,47 @@ export type CommissionsQueryParams = {
   to?: string | null;
   allDates?: boolean;
   dojoId?: string;
-  instructorId?: string;
+  instructor?: string;
   status?: string;
-  assignment?: "all" | "assigned" | "unassigned";
   page?: number;
   limit?: number;
   sort?: string;
   order?: "asc" | "desc";
-  scopeInstructorId?: string;
 };
+
+function emptyDashboard(
+  filters: {
+    from: string | null;
+    to: string | null;
+    dojoId: string;
+    instructor: string;
+    status: string;
+  },
+  page: number
+) {
+  return {
+    filters,
+    summary: {
+      tests: 0,
+      fees: 0,
+      commission: 0,
+      profit: 0,
+      noMainInstructor: { tests: 0, commission: 0 },
+      missingFeeSetting: 0,
+    },
+    byInstructor: [] as Array<{
+      instructorName: string;
+      dojoId: string;
+      dojoName: string;
+      tests: number;
+      commission: number;
+    }>,
+    entries: [],
+    total: 0,
+    page,
+    totalPages: 1,
+  };
+}
 
 export async function queryCommissionsDashboard(params: CommissionsQueryParams) {
   await connectDB();
@@ -235,15 +201,48 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
   const page = Math.max(params.page ?? 1, 1);
   const limit = Math.min(params.limit ?? 50, 100);
   const skip = (page - 1) * limit;
-  const assignment = params.assignment ?? "all";
   const sortField = params.sort ?? "awardedDate";
   const order = params.order === "asc" ? 1 : -1;
+  const dojoId = params.dojoId?.trim() || "";
+  const instructor = params.instructor?.trim() || "";
 
   const dateParts = parseInclusiveDateRange(
     params.from,
     params.to,
     params.allDates === true
   );
+
+  const filters = {
+    from: dateParts.from,
+    to: dateParts.to,
+    dojoId,
+    instructor,
+    status: params.status?.trim() || "",
+  };
+
+  const dojoIndex = await loadDojoCommissionIndex();
+  const dojos = uniqueDojos(dojoIndex);
+
+  let allowedDojoKeys: string[] | null = null;
+  if (dojoId) {
+    const selected = dojoIndex.get(dojoId);
+    if (!selected) return emptyDashboard(filters, page);
+    allowedDojoKeys = studentDojoKeys(selected);
+  }
+
+  if (instructor) {
+    const named = dojos.filter(
+      (dojo) => dojo.mainInstructor?.toLowerCase() === instructor.toLowerCase()
+    );
+    const keys = named.flatMap(studentDojoKeys);
+    if (allowedDojoKeys) {
+      const allowed = new Set(keys);
+      allowedDojoKeys = allowedDojoKeys.filter((key) => allowed.has(key));
+    } else {
+      allowedDojoKeys = keys;
+    }
+    if (allowedDojoKeys.length === 0) return emptyDashboard(filters, page);
+  }
 
   const progressionFilter: Record<string, unknown> = {};
   const andClauses: Record<string, unknown>[] = [];
@@ -257,39 +256,17 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
     andClauses.push(statusFilter);
   }
 
-  if (params.scopeInstructorId) {
-    andClauses.push({
-      instructorId: new mongoose.Types.ObjectId(params.scopeInstructorId),
-    });
-  } else if (assignment === "unassigned") {
-    andClauses.push({
-      $or: [{ instructorId: null }, { instructorId: { $exists: false } }],
-    });
-  } else if (assignment === "assigned") {
-    andClauses.push({ instructorId: { $ne: null, $exists: true } });
-  }
-
-  if (
-    assignment !== "unassigned" &&
-    params.instructorId?.trim() &&
-    !params.scopeInstructorId
-  ) {
-    if (!mongoose.Types.ObjectId.isValid(params.instructorId)) {
-      throw new Error("Invalid instructorId");
-    }
-    andClauses.push({
-      instructorId: new mongoose.Types.ObjectId(params.instructorId),
-    });
-  }
-
   if (andClauses.length > 0) {
     progressionFilter.$and = andClauses;
   }
 
-  const dojoId = params.dojoId?.trim() || "";
   let studentScopeFilter: Record<string, unknown> = {};
-  if (dojoId) {
-    const matchingStudents = await Student.find({ dojoId }).select("_id").lean();
+  if (allowedDojoKeys) {
+    const matchingStudents = await Student.find({
+      dojoId: { $in: allowedDojoKeys },
+    })
+      .select("_id")
+      .lean();
     studentScopeFilter = {
       studentId: { $in: matchingStudents.map((s) => s._id) },
     };
@@ -297,32 +274,17 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
 
   const listFilter = { ...progressionFilter, ...studentScopeFilter };
 
-  const [feeMap, allMatching, total] = await Promise.all([
+  const [feeMap, allMatching] = await Promise.all([
     loadFeeSettingsMap(),
     BeltProgression.find(listFilter)
       .populate({
         path: "studentId",
         select: "name studentId dojoId",
       })
-      .populate({ path: "instructorId", select: "name" })
       .lean(),
-    BeltProgression.countDocuments(listFilter),
   ]);
 
   const enriched = await enrichEntriesWithFromBelt(allMatching);
-
-  const dojoIds = new Set<string>();
-  for (const entry of enriched) {
-    const st = entry.studentId as PopulatedStudent | null;
-    if (st?.dojoId) dojoIds.add(st.dojoId);
-  }
-
-  const dojos = await Dojo.find({
-    dojoId: { $in: [...dojoIds] },
-  })
-    .select("dojoId name")
-    .lean();
-  const dojoNameById = new Map(dojos.map((d) => [d.dojoId, d.name]));
 
   type Row = {
     _id: string;
@@ -333,7 +295,6 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
     awardedDate: string;
     dojoId: string | null;
     dojoName: string | null;
-    instructorId: string | null;
     instructorName: string | null;
     examiner: string | null;
     fee: number | null;
@@ -351,14 +312,8 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
         ? (studentRaw as PopulatedStudent)
         : null;
 
-    const instructorRaw = entry.instructorId;
-    const instructor =
-      instructorRaw && typeof instructorRaw === "object" && "name" in instructorRaw
-        ? (instructorRaw as { _id: unknown; name?: string })
-        : null;
-
     const money = computeMoneyForBelt(entry.beltName, feeMap);
-    const dojoIdVal = student?.dojoId ?? null;
+    const linked = student?.dojoId ? dojoIndex.get(student.dojoId) : undefined;
 
     return {
       _id: String(entry._id),
@@ -373,10 +328,9 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
       fromBelt: entry.fromBelt as string | undefined,
       status: (entry.status === "Fail" ? "Fail" : "Pass") as "Pass" | "Fail",
       awardedDate: new Date(entry.awardedDate).toISOString(),
-      dojoId: dojoIdVal,
-      dojoName: dojoIdVal ? dojoNameById.get(dojoIdVal) ?? null : null,
-      instructorId: instructor ? String(instructor._id) : entry.instructorId ? String(entry.instructorId) : null,
-      instructorName: instructor?.name ?? null,
+      dojoId: linked?.dojoId ?? null,
+      dojoName: linked?.name ?? null,
+      instructorName: linked?.mainInstructor ?? null,
       examiner: entry.examiner ?? null,
       fee: money.fee,
       commission: money.commission,
@@ -392,20 +346,16 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
     fees: 0,
     commission: 0,
     profit: 0,
-    unassigned: {
+    noMainInstructor: {
       tests: 0,
-      fees: 0,
       commission: 0,
-      profit: 0,
     },
     missingFeeSetting: 0,
   };
 
-  type InstructorKey = string;
   const byInstructorMap = new Map<
-    InstructorKey,
+    string,
     {
-      instructorId: string;
       instructorName: string;
       dojoId: string;
       dojoName: string;
@@ -424,28 +374,26 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
     const commission = row.commission ?? 0;
     const profit = row.profit ?? 0;
 
-    if (!row.instructorId) {
-      summary.unassigned.tests += 1;
-      summary.unassigned.fees += fee;
-      summary.unassigned.commission += commission;
-      summary.unassigned.profit += profit;
+    summary.fees += fee;
+    summary.profit += profit;
+
+    if (!row.instructorName) {
+      summary.noMainInstructor.tests += 1;
+      summary.noMainInstructor.commission += commission;
       continue;
     }
 
-    summary.fees += fee;
     summary.commission += commission;
-    summary.profit += profit;
 
     const dojoKey = row.dojoId ?? "";
-    const key = `${row.instructorId}:${dojoKey}`;
+    const key = `${row.instructorName.toLowerCase()}:${dojoKey}`;
     const existing = byInstructorMap.get(key);
     if (existing) {
       existing.tests += 1;
       existing.commission += commission;
     } else {
       byInstructorMap.set(key, {
-        instructorId: row.instructorId,
-        instructorName: row.instructorName ?? "",
+        instructorName: row.instructorName,
         dojoId: dojoKey,
         dojoName: row.dojoName ?? "",
         tests: 1,
@@ -481,6 +429,7 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
   };
 
   rows.sort(compareRows);
+  const total = rows.length;
   const paged = rows.slice(skip, skip + limit);
 
   const byInstructor = [...byInstructorMap.values()].sort((a, b) =>
@@ -488,14 +437,7 @@ export async function queryCommissionsDashboard(params: CommissionsQueryParams) 
   );
 
   return {
-    filters: {
-      from: dateParts.from,
-      to: dateParts.to,
-      dojoId,
-      instructorId: params.instructorId?.trim() || "",
-      status: params.status?.trim() || "",
-      assignment,
-    },
+    filters,
     summary,
     byInstructor,
     entries: paged.map(

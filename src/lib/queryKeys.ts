@@ -42,9 +42,8 @@ export const queryKeys = {
         to?: string;
         all?: boolean;
         dojoId?: string;
-        instructorId?: string;
+        instructor?: string;
         status?: string;
-        assignment?: string;
         sort?: string;
         order?: string;
       } = {}

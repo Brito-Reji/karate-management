@@ -2,7 +2,6 @@ import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
 import { BELTS } from "@/lib/constants";
-import { resolveDojoMainInstructor } from "@/lib/commissions";
 import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
 
@@ -50,8 +49,6 @@ export async function POST(request, { params }) {
       ).lean();
     }
 
-    const mainInstructor = await resolveDojoMainInstructor(student.dojoId);
-
     const progression = await BeltProgression.create({
       studentId: student._id,
       beltName,
@@ -59,7 +56,6 @@ export async function POST(request, { params }) {
       rank: newBelt.rank,
       awardedDate: awardedDate || new Date(),
       examiner: examiner || user.name,
-      instructorId: mainInstructor?.id ?? null,
       notes,
       status,
     });

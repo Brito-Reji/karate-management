@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import {
-  assignTestInstructor,
   commissionDashboardQuery,
   commissionSettingsQuery,
   upsertCommissionSetting,
@@ -32,15 +31,3 @@ export function useUpsertCommissionSetting() {
   });
 }
 
-export function useAssignTestInstructor() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ testId, instructorId }: { testId: string; instructorId: string }) =>
-      assignTestInstructor(testId, instructorId),
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.commissions.all() });
-      qc.invalidateQueries({ queryKey: queryKeys.tests.all() });
-      qc.invalidateQueries({ queryKey: ['examDay'] });
-    },
-  });
-}

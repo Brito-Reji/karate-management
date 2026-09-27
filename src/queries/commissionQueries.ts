@@ -19,7 +19,6 @@ export type CommissionDashboardEntry = {
   awardedDate: string;
   dojoId: string | null;
   dojoName: string | null;
-  instructorId: string | null;
   instructorName: string | null;
   examiner: string | null;
   fee: number | null;
@@ -34,25 +33,21 @@ export type CommissionDashboardResponse = {
     from: string | null;
     to: string | null;
     dojoId: string;
-    instructorId: string;
+    instructor: string;
     status: string;
-    assignment: string;
   };
   summary: {
     tests: number;
     fees: number;
     commission: number;
     profit: number;
-    unassigned: {
+    noMainInstructor: {
       tests: number;
-      fees: number;
       commission: number;
-      profit: number;
     };
     missingFeeSetting: number;
   };
   byInstructor: Array<{
-    instructorId: string;
     instructorName: string;
     dojoId: string;
     dojoName: string;
@@ -91,9 +86,8 @@ export async function fetchCommissionDashboard(
     to?: string;
     all?: boolean;
     dojoId?: string;
-    instructorId?: string;
+    instructor?: string;
     status?: string;
-    assignment?: string;
     sort?: string;
     order?: string;
   } = {}
@@ -106,9 +100,8 @@ export async function fetchCommissionDashboard(
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
   if (filters.dojoId) params.set('dojoId', filters.dojoId);
-  if (filters.instructorId) params.set('instructorId', filters.instructorId);
+  if (filters.instructor) params.set('instructor', filters.instructor);
   if (filters.status) params.set('status', filters.status);
-  if (filters.assignment) params.set('assignment', filters.assignment);
   if (filters.sort) params.set('sort', filters.sort);
   if (filters.order) params.set('order', filters.order);
 
@@ -162,20 +155,3 @@ export async function upsertCommissionSetting(data: FeeSettingInput) {
   };
 }
 
-export async function assignTestInstructor(testId: string, instructorId: string) {
-  const res = await fetch(`/api/admin/commissions/tests/${testId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ instructorId }),
-  });
-  const json = await res.json();
-  if (!res.ok || !json.success) {
-    throw new Error(json.message || 'Failed to assign instructor');
-  }
-  return json.entry as {
-    _id: string;
-    instructorId: string;
-    instructorName: string;
-    examiner: string;
-  };
-}
