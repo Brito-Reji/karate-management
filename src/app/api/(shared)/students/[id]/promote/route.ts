@@ -1,6 +1,7 @@
 import connectDB from "@/lib/db";
 import Student from "@/models/Student";
 import BeltProgression from "@/models/BeltProgression";
+import mongoose from "mongoose";
 import { BELTS } from "@/lib/constants";
 import { requireAdmin } from "@/lib/requireAuth";
 import { NextResponse } from "next/server";
@@ -13,8 +14,13 @@ export async function POST(request, { params }) {
   try {
     await connectDB();
     const { id } = await params;
-    const { beltName, awardedDate, examiner, notes, status = "Pass" } =
+    const { beltName, awardedDate, examiner, notes, status = "Pass", instructorId } =
       await request.json();
+
+    const normalizedInstructorId =
+      typeof instructorId === "string" && mongoose.Types.ObjectId.isValid(instructorId)
+        ? new mongoose.Types.ObjectId(instructorId)
+        : null;
 
     const student = await Student.findById(id).lean();
     if (!student) {
@@ -56,6 +62,7 @@ export async function POST(request, { params }) {
       rank: newBelt.rank,
       awardedDate: awardedDate || new Date(),
       examiner: examiner || user.name,
+      instructorId: normalizedInstructorId,
       notes,
       status,
     });
