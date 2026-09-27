@@ -46,6 +46,7 @@ export type BeltHistoryEntry = {
   rank: number;
   awardedDate: string;
   examiner?: string;
+  instructorId?: string | null;
   notes?: string;
   status?: 'Pass' | 'Fail';
   createdAt?: string;
@@ -58,6 +59,7 @@ export type RecentTestEntry = {
   rank: number;
   awardedDate: string;
   examiner?: string;
+  instructorId?: string | null;
   notes?: string;
   status?: 'Pass' | 'Fail';
   createdAt?: string;
@@ -196,6 +198,9 @@ export type DojoDropdownOption = {
   location: string;
   instructor?: string;
   instructors?: string[];
+  instructorIds?: string[];
+  registeredInstructors?: { _id: string; name: string }[];
+  mainInstructor?: string | null;
 };
 
 // unpaginated dojo list for dropdowns
@@ -294,18 +299,20 @@ export async function promoteStudent({
   examiner,
   notes,
   status = 'Pass',
+  instructorId,
 }: {
   id: string;
   beltName: string;
   awardedDate?: string;
   examiner?: string;
+  instructorId?: string | null;
   notes?: string;
   status?: 'Pass' | 'Fail';
 }): Promise<{ student: Student; progression: BeltHistoryEntry }> {
   const res = await fetch(`/api/students/${id}/promote`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ beltName, awardedDate, examiner, notes, status }),
+    body:    JSON.stringify({ beltName, awardedDate, examiner, notes, status, instructorId }),
   });
   if (!res.ok) {
     const json = await res.json();
@@ -326,6 +333,7 @@ export async function updateBeltHistoryEntry({
   examiner,
   notes,
   status,
+  instructorId,
 }: {
   studentId: string;
   entryId: string;
@@ -333,13 +341,14 @@ export async function updateBeltHistoryEntry({
   fromBelt?: string;
   awardedDate?: string;
   examiner?: string;
+  instructorId?: string | null;
   notes?: string;
   status?: 'Pass' | 'Fail';
 }): Promise<{ entry: BeltHistoryEntry; belt?: string }> {
   const res = await fetch(`/api/students/${studentId}/belt-history/${entryId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ beltName, fromBelt, awardedDate, examiner, notes, status }),
+    body: JSON.stringify({ beltName, fromBelt, awardedDate, examiner, notes, status, instructorId }),
   });
   if (!res.ok) {
     const json = await res.json();

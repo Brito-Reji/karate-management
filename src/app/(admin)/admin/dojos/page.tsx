@@ -7,6 +7,38 @@ import useDebounce from '@/hooks/useDebounce';
 import { useSearchDojos } from '@/hooks/useSearchDojos';
 import { useStaffUsers } from '@/hooks/useStaffUsers';
 import RowIndexBadge from '@/components/RowIndexBadge';
+import type { StaffUser } from '@/queries/staffQueries';
+
+type RegisteredInstructor = { _id: string; name: string };
+
+function namesFromLinkedAndLegacy(
+  instructorIds: string[],
+  legacyInstructors: string[],
+  resolveUser: (id: string) => StaffUser | RegisteredInstructor | undefined
+): string[] {
+  const linkedNames = instructorIds
+    .map((id) => resolveUser(id)?.name?.trim())
+    .filter(Boolean) as string[];
+  const legacy = legacyInstructors.map((n) => n.trim()).filter(Boolean);
+  return [...new Set([...linkedNames, ...legacy])];
+}
+
+function legacyNamesFromDojo(
+  instructorNames: string[],
+  instructorIds: string[],
+  registered: RegisteredInstructor[]
+): string[] {
+  const linkedNameKeys = new Set(
+    instructorIds
+      .map((id) => registered.find((r) => r._id === id)?.name?.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const legacy = instructorNames
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .filter((n) => !linkedNameKeys.has(n.toLowerCase()));
+  return legacy.length > 0 ? legacy : [''];
+}
 
 // skeleton shown during loading
 function SkeletonRows() {
@@ -44,8 +76,9 @@ function DojosContent() {
   const [formData, setFormData] = useState({
     name: '',
     location: '',
-    instructors: [''],
+    legacyInstructors: [''],
     instructorIds: [] as string[],
+    mainInstructor: '',
   });
   const [formError, setFormError] = useState('');
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -103,6 +136,38 @@ function DojosContent() {
     [staffUsers]
   );
 
+  const [modalRegistered, setModalRegistered] = useState<RegisteredInstructor[]>([]);
+
+  const resolveInstructorUser = useCallback(
+    (id: string) =>
+      approvedInstructors.find((u) => u._id === id) ??
+      modalRegistered.find((r) => r._id === id),
+    [approvedInstructors, modalRegistered]
+  );
+
+  const mergedInstructorNames = useMemo(
+    () =>
+      namesFromLinkedAndLegacy(
+        formData.instructorIds,
+        formData.legacyInstructors,
+        resolveInstructorUser
+      ),
+    [formData.instructorIds, formData.legacyInstructors, resolveInstructorUser]
+  );
+
+  const linkedInstructorRows = useMemo(
+    () =>
+      formData.instructorIds
+        .map((id) => resolveInstructorUser(id))
+        .filter((u): u is StaffUser | RegisteredInstructor => Boolean(u)),
+    [formData.instructorIds, resolveInstructorUser]
+  );
+
+  const availableToLink = useMemo(
+    () => approvedInstructors.filter((u) => !formData.instructorIds.includes(u._id)),
+    [approvedInstructors, formData.instructorIds]
+  );
+
   const setParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([k, v]) => {
@@ -136,23 +201,41 @@ function DojosContent() {
 
   const openCreateModal = () => {
     setEditingDojo(null);
-    setFormData({ name: '', location: '', instructors: [''], instructorIds: [] });
+    setModalRegistered([]);
+    setFormData({
+      name: '',
+      location: '',
+      legacyInstructors: [''],
+      instructorIds: [],
+      mainInstructor: '',
+    });
     setFormError('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (dojo) => {
     setEditingDojo(dojo);
-    // split legacy instructors
-    const parsedInstructors = dojo.instructors && dojo.instructors.length > 0
-      ? [...dojo.instructors]
-      : (dojo.instructor ? dojo.instructor.split(',').map((s) => s.trim()).filter(Boolean) : []);
+    const registered: RegisteredInstructor[] = dojo.registeredInstructors ?? [];
+    setModalRegistered(registered);
+    const parsedInstructors =
+      dojo.instructors && dojo.instructors.length > 0
+        ? [...dojo.instructors]
+        : dojo.instructor
+          ? dojo.instructor.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+    const instructorIds = dojo.instructorIds ?? [];
+    const legacyInstructors = legacyNamesFromDojo(
+      parsedInstructors,
+      instructorIds,
+      registered
+    );
 
     setFormData({
       name: dojo.name,
       location: dojo.location,
-      instructors: parsedInstructors.length > 0 ? parsedInstructors : [''],
-      instructorIds: dojo.instructorIds ?? [],
+      legacyInstructors,
+      instructorIds,
+      mainInstructor: dojo.mainInstructor ?? '',
     });
     setFormError('');
     setIsModalOpen(true);
@@ -163,9 +246,23 @@ function DojosContent() {
     if (!formData.name || !formData.location) return;
     setFormError('');
 
-    const cleanedInstructors = formData.instructors.map((i) => i.trim()).filter(Boolean);
+    const cleanedInstructors = namesFromLinkedAndLegacy(
+      formData.instructorIds,
+      formData.legacyInstructors,
+      resolveInstructorUser
+    );
     if (cleanedInstructors.length === 0) {
       setFormError('Please add at least one instructor.');
+      return;
+    }
+
+    const mainInstructor = cleanedInstructors.includes(formData.mainInstructor)
+      ? formData.mainInstructor
+      : cleanedInstructors.length === 1
+        ? cleanedInstructors[0]
+        : '';
+    if (!mainInstructor) {
+      setFormError('Select the main instructor who receives test commission.');
       return;
     }
 
@@ -174,6 +271,7 @@ function DojosContent() {
       location: formData.location,
       instructors: cleanedInstructors,
       instructorIds: formData.instructorIds,
+      mainInstructor,
     };
 
     if (editingDojo) {
@@ -281,25 +379,41 @@ function DojosContent() {
                         </div>
                         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-zinc-500">
                           <span className="text-zinc-400 font-medium break-words">
-                            {dojo.instructors && dojo.instructors.length > 0
-                              ? dojo.instructors.join(", ")
-                              : (dojo.instructor || '—')}
+                            {(() => {
+                              const registered = dojo.registeredInstructors ?? [];
+                              const registeredNameKeys = new Set(
+                                registered.map((r) => r.name.trim().toLowerCase())
+                              );
+                              const fromStrings =
+                                dojo.instructors && dojo.instructors.length > 0
+                                  ? dojo.instructors
+                                  : dojo.instructor
+                                    ? dojo.instructor.split(',').map((s) => s.trim()).filter(Boolean)
+                                    : [];
+                              const extraLinked = registered
+                                .map((r) => r.name.trim())
+                                .filter((name) => name && !fromStrings.some(
+                                  (n) => n.trim().toLowerCase() === name.toLowerCase()
+                                ));
+                              const displayNames = [...fromStrings, ...extraLinked];
+                              if (displayNames.length === 0) return '—';
+                              return displayNames.map((name, nameIndex) => (
+                                <span key={`${name}-${nameIndex}`}>
+                                  {nameIndex > 0 ? ', ' : ''}
+                                  <span className={name === dojo.mainInstructor ? 'text-amber-200' : undefined}>
+                                    {name}
+                                    {name === dojo.mainInstructor ? ' (Main)' : ''}
+                                    {registeredNameKeys.has(name.trim().toLowerCase()) ? (
+                                      <span className="text-sky-400/80 text-[10px] ml-0.5">· account</span>
+                                    ) : null}
+                                  </span>
+                                </span>
+                              ));
+                            })()}
                           </span>
                           <span className="text-zinc-700">•</span>
                           <span className="break-words">{dojo.location}</span>
                         </div>
-                        {dojo.registeredInstructors && dojo.registeredInstructors.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-0.5">
-                            {dojo.registeredInstructors.map((inst) => (
-                              <span
-                                key={inst._id}
-                                className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-950/30 border border-sky-500/20 text-sky-300"
-                              >
-                                {inst.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -417,44 +531,141 @@ function DojosContent() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Legacy Instructors (names)</label>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({
-                      ...formData,
-                      instructors: [...formData.instructors, '']
-                    })}
-                    className="text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors flex items-center space-x-1"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
-                    </svg>
-                    <span>Add Instructor</span>
-                  </button>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">Instructors</label>
+                  <div className="flex items-center gap-2">
+                    {availableToLink.length > 0 && (
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (!id) return;
+                          setFormData({
+                            ...formData,
+                            instructorIds: [...formData.instructorIds, id],
+                          });
+                          e.target.value = '';
+                        }}
+                        className="h-8 max-w-[11rem] px-2 rounded-lg bg-zinc-900/50 border border-zinc-800 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-500"
+                      >
+                        <option value="">Link account…</option>
+                        {availableToLink.map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          legacyInstructors: [...formData.legacyInstructors, ''],
+                        })
+                      }
+                      className="text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors flex items-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7-7H5.5" />
+                      </svg>
+                      <span>Add name</span>
+                    </button>
+                  </div>
                 </div>
+                <p className="text-[11px] text-zinc-600">
+                  Linked accounts and any extra names without an account appear in one list.
+                </p>
 
-                <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                  {formData.instructors.map((inst, index) => (
-                    <div key={index} className="flex items-center space-x-2 animate-fadeIn">
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 border border-white/[0.06] rounded-lg p-2">
+                  {linkedInstructorRows.length === 0 &&
+                  formData.legacyInstructors.every((n) => !n.trim()) ? (
+                    <p className="text-xs text-zinc-600 italic px-1 py-2">No instructors yet.</p>
+                  ) : null}
+
+                  {linkedInstructorRows.map((user) => (
+                    <div
+                      key={user._id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-sky-950/20 border border-sky-500/10"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-zinc-200 truncate">{user.name}</p>
+                        {'email' in user && user.email ? (
+                          <p className="text-[10px] text-zinc-600 truncate">{user.email}</p>
+                        ) : (
+                          <p className="text-[10px] text-sky-400/80">Registered account</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const removedName = user.name.trim();
+                          const nextIds = formData.instructorIds.filter((id) => id !== user._id);
+                          const namesAfter = namesFromLinkedAndLegacy(
+                            nextIds,
+                            formData.legacyInstructors,
+                            resolveInstructorUser
+                          );
+                          const mainInstructor =
+                            formData.mainInstructor === removedName && !namesAfter.includes(removedName)
+                              ? namesAfter.length === 1
+                                ? namesAfter[0]
+                                : ''
+                              : formData.mainInstructor;
+                          setFormData({ ...formData, instructorIds: nextIds, mainInstructor });
+                        }}
+                        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border border-zinc-800 text-zinc-500 hover:text-red-400 hover:border-red-500/20 transition-all"
+                        aria-label={`Remove ${user.name}`}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  {formData.legacyInstructors.map((inst, index) => (
+                    <div key={`legacy-${index}`} className="flex items-center space-x-2 animate-fadeIn">
                       <input
                         type="text"
-                        required
                         value={inst}
                         onChange={(e) => {
-                          const updated = [...formData.instructors];
+                          const updated = [...formData.legacyInstructors];
+                          const previous = updated[index].trim();
                           updated[index] = e.target.value;
-                          setFormData({ ...formData, instructors: updated });
+                          const mainInstructor =
+                            formData.mainInstructor === previous
+                              ? e.target.value.trim()
+                              : formData.mainInstructor;
+                          setFormData({ ...formData, legacyInstructors: updated, mainInstructor });
                         }}
-                        placeholder={`Sensei Name ${index + 1}`}
+                        placeholder="Name without account"
                         className="flex-1 h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
                       />
-                      {formData.instructors.length > 1 && (
+                      {(formData.legacyInstructors.length > 1 || inst.trim()) && (
                         <button
                           type="button"
                           onClick={() => {
-                            const updated = formData.instructors.filter((_, idx) => idx !== index);
-                            setFormData({ ...formData, instructors: updated });
+                            const removed = formData.legacyInstructors[index].trim();
+                            const updated = formData.legacyInstructors.filter((_, idx) => idx !== index);
+                            const legacy =
+                              updated.length > 0 ? updated : [''];
+                            const namesAfter = namesFromLinkedAndLegacy(
+                              formData.instructorIds,
+                              legacy,
+                              resolveInstructorUser
+                            );
+                            const mainInstructor =
+                              formData.mainInstructor === removed && !namesAfter.includes(removed)
+                                ? namesAfter.length === 1
+                                  ? namesAfter[0]
+                                  : ''
+                                : formData.mainInstructor;
+                            setFormData({
+                              ...formData,
+                              legacyInstructors: legacy,
+                              mainInstructor,
+                            });
                           }}
                           className="h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/20 hover:bg-red-950/20 hover:border-red-500/20 hover:text-red-400 text-zinc-500 transition-all"
                         >
@@ -468,44 +679,25 @@ function DojosContent() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-400 tracking-wide">
-                  Registered Instructors (accounts)
+                  Main instructor (commission)
                 </label>
                 <p className="text-[11px] text-zinc-600">
-                  Link approved instructor accounts. Kept separate from legacy name fields during migration.
+                  Choose one name from this dojo&apos;s instructor list. Test commission goes to that instructor.
                 </p>
-                {approvedInstructors.length === 0 ? (
-                  <p className="text-xs text-zinc-600 italic">No approved instructors available yet.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 border border-white/[0.06] rounded-lg p-2">
-                    {approvedInstructors.map((user) => {
-                      const checked = formData.instructorIds.includes(user._id);
-                      return (
-                        <label
-                          key={user._id}
-                          className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              const next = checked
-                                ? formData.instructorIds.filter((id) => id !== user._id)
-                                : [...formData.instructorIds, user._id];
-                              setFormData({ ...formData, instructorIds: next });
-                            }}
-                            className="rounded border-zinc-700 bg-zinc-900 text-sky-500 focus:ring-sky-500/30"
-                          />
-                          <span className="text-sm text-zinc-300">{user.name}</span>
-                          {user.email && (
-                            <span className="text-[10px] text-zinc-600 truncate">{user.email}</span>
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
+                <select
+                  value={formData.mainInstructor}
+                  onChange={(e) => setFormData({ ...formData, mainInstructor: e.target.value })}
+                  className="w-full h-10 px-4 rounded-lg bg-zinc-900/50 border border-zinc-800 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500 focus:bg-zinc-900 transition-all"
+                >
+                  <option value="">Select main instructor</option>
+                  {mergedInstructorNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center justify-end space-x-3 pt-2">

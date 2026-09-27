@@ -78,6 +78,9 @@ async function handleAdminAuth(
     if (pathname.startsWith("/admin/exam-day") && role !== "admin") {
       return redirectTo(portalPath("admin", "/dojos", host), request);
     }
+    if (pathname.startsWith("/admin/commissions") && role !== "admin") {
+      return redirectTo(portalPath("admin", "/dojos", host), request);
+    }
     if (pathname.startsWith("/admin/staff") && role !== "admin") {
       return redirectTo(portalPath("admin", "/dojos", host), request);
     }

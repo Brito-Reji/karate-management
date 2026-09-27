@@ -1,9 +1,9 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
-import Dojo from "@/models/Dojo";
 import ChangeRequest from "@/models/ChangeRequest";
 import { revalidateDojosCache } from "@/lib/cacheTags";
 import { applyApprovedChangeRequest, rejectChangeRequest } from "@/lib/changeRequests";
+import { linkApprovedInstructorToDojos } from "@/lib/dojoInstructors";
 import { requireAdmin } from "@/lib/requireAuth";
 import mongoose from "mongoose";
 import { type NextRequest, NextResponse } from "next/server";
@@ -79,11 +79,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       );
 
       if (validDojoIds.length > 0) {
-        await Dojo.updateMany(
-          { _id: { $in: validDojoIds } },
-          { $addToSet: { instructorIds: target._id } }
+        await linkApprovedInstructorToDojos(
+          target._id,
+          validDojoIds,
+          target.name ?? ""
         );
-
         revalidateDojosCache();
       }
     } else {

@@ -1,5 +1,6 @@
 import connectDB from "@/lib/db";
 import BeltProgression from "@/models/BeltProgression";
+import mongoose from "mongoose";
 import { BELTS } from "@/lib/constants";
 import { recomputeStudentBelt } from "@/lib/beltHistory";
 import { requireAdmin } from "@/lib/requireAuth";
@@ -13,9 +14,21 @@ export async function PUT(request, { params }) {
   try {
     await connectDB();
     const { id, entryId } = await params;
-    const { beltName, fromBelt, awardedDate, examiner, notes, status } = await request.json();
+    const { beltName, fromBelt, awardedDate, examiner, notes, status, instructorId } =
+      await request.json();
 
-    const updateFields: Record<string, unknown> = { awardedDate, examiner, notes, status };
+    const normalizedInstructorId =
+      typeof instructorId === "string" && mongoose.Types.ObjectId.isValid(instructorId)
+        ? new mongoose.Types.ObjectId(instructorId)
+        : null;
+
+    const updateFields: Record<string, unknown> = {
+      awardedDate,
+      examiner,
+      notes,
+      status,
+      instructorId: normalizedInstructorId,
+    };
 
     if (beltName) {
       updateFields.beltName = beltName;

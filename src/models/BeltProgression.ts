@@ -7,6 +7,7 @@ export type BeltProgressionDocument = {
   rank: number;
   awardedDate: Date;
   examiner?: string;
+  instructorId?: mongoose.Types.ObjectId | null;
   notes?: string;
   status?: "Pass" | "Fail";
   createdAt?: Date;
@@ -25,6 +26,12 @@ const beltProgressionSchema = new mongoose.Schema(
     rank: { type: Number, required: true },
     awardedDate: { type: Date, required: true, default: Date.now },
     examiner: { type: String },
+    instructorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
     notes: { type: String },
     status: { type: String, enum: ["Pass", "Fail"], default: "Pass" },
   },
@@ -32,6 +39,7 @@ const beltProgressionSchema = new mongoose.Schema(
 );
 
 beltProgressionSchema.index({ awardedDate: -1, createdAt: -1 });
+beltProgressionSchema.index({ instructorId: 1, awardedDate: -1 });
 
 const BeltProgression =
   (mongoose.models.BeltProgression as Model<BeltProgressionDocument> | undefined) ||

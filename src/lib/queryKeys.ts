@@ -32,6 +32,25 @@ export const queryKeys = {
     ) => ['examDay', { page, limit, ...filters }],
   },
 
+  commissions: {
+    all: () => ['commissions'],
+    dashboard: (
+      page = 1,
+      limit = 50,
+      filters: {
+        from?: string;
+        to?: string;
+        all?: boolean;
+        dojoId?: string;
+        instructor?: string;
+        status?: string;
+        sort?: string;
+        order?: string;
+      } = {}
+    ) => ['commissions', 'dashboard', { page, limit, ...filters }],
+    settings: () => ['commissions', 'settings'],
+  },
+
   staff: {
     all: () => ['staff'],
     list: () => ['staff', 'list'],
