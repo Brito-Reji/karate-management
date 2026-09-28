@@ -1,5 +1,11 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
+import { revalidateDojosCache } from "@/lib/cacheTags";
+import {
+  clearInstructorDojoLinks,
+  replaceInstructorDojoAssignments,
+  validateDojoMongoIds,
+} from "@/lib/dojoInstructors";
 import { requireAdmin } from "@/lib/requireAuth";
 import { setAuthCookie } from "@/lib/authCookie";
 import { type NextRequest, NextResponse } from "next/server";
@@ -31,11 +37,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const body = await request.json();
     const role = body?.role;
     const isBlocked = body?.isBlocked;
+    const rawDojoIds = body?.dojoIds;
 
     const hasRole = role !== undefined;
     const hasBlocked = isBlocked !== undefined;
+    const hasDojoIds = rawDojoIds !== undefined;
 
-    if (!hasRole && !hasBlocked) {
+    if (!hasRole && !hasBlocked && !hasDojoIds) {
       return NextResponse.json(
         { success: false, message: "Nothing to update" },
         { status: 400 }
@@ -54,6 +62,24 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         { success: false, message: "isBlocked must be a boolean" },
         { status: 400 }
       );
+    }
+
+    if (hasDojoIds && !Array.isArray(rawDojoIds)) {
+      return NextResponse.json(
+        { success: false, message: "dojoIds must be an array" },
+        { status: 400 }
+      );
+    }
+
+    let validatedDojoIds: string[] | null = null;
+    if (hasDojoIds) {
+      try {
+        validatedDojoIds = await validateDojoMongoIds(rawDojoIds);
+      } catch (validationErr) {
+        const message =
+          validationErr instanceof Error ? validationErr.message : "Invalid dojo selection";
+        return NextResponse.json({ success: false, message }, { status: 400 });
+      }
     }
 
     const target = await User.findById(id);
@@ -94,6 +120,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     let changed = false;
+    let dojosCacheStale = false;
 
     if (hasRole && target.role !== role) {
       if (target.role === "admin" && role === "instructor") {
@@ -105,8 +132,43 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           );
         }
       }
+      const previousRole = target.role;
       target.role = role;
       changed = true;
+
+      if (role === "admin" && previousRole === "instructor") {
+        await clearInstructorDojoLinks(target._id, target.name);
+        target.dojoIds = [];
+        dojosCacheStale = true;
+      }
+    }
+
+    const effectiveRole = hasRole ? role : target.role;
+
+    if (hasDojoIds) {
+      if (effectiveRole === "admin") {
+        if (validatedDojoIds!.length > 0) {
+          return NextResponse.json(
+            { success: false, message: "Admins cannot be assigned to dojos" },
+            { status: 400 }
+          );
+        }
+        if (target.role === "instructor" || (target.dojoIds && target.dojoIds.length > 0)) {
+          await clearInstructorDojoLinks(target._id, target.name);
+          target.dojoIds = [];
+          dojosCacheStale = true;
+          changed = true;
+        }
+      } else if (effectiveRole === "instructor") {
+        await replaceInstructorDojoAssignments(
+          target._id,
+          target.name,
+          validatedDojoIds!
+        );
+        target.dojoIds = validatedDojoIds!;
+        dojosCacheStale = true;
+        changed = true;
+      }
     }
 
     if (hasBlocked && target.isBlocked !== isBlocked) {
@@ -123,6 +185,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     target.updatedAt = new Date();
     await target.save();
+
+    if (dojosCacheStale) {
+      revalidateDojosCache();
+    }
 
     const selfUpdated = actor.userId === target._id.toString();
     const response = NextResponse.json({

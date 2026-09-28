@@ -8,6 +8,7 @@ export type StaffUser = {
   role: 'admin' | 'instructor';
   isBlocked?: boolean;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  dojoIds?: string[];
   createdAt?: string;
 };
 
@@ -47,6 +48,22 @@ export async function updateStaffBlocked(
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json.message || 'Failed to update block status');
+  }
+  return { user: json.user };
+}
+
+export async function updateStaffDojos(
+  id: string,
+  dojoIds: string[]
+): Promise<{ user: StaffUser }> {
+  const res = await fetch(`/api/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dojoIds }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update dojo assignments');
   }
   return { user: json.user };
 }

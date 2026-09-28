@@ -1,5 +1,10 @@
 import connectDB from "@/lib/db";
 import User from "@/models/User";
+import { revalidateDojosCache } from "@/lib/cacheTags";
+import {
+  linkApprovedInstructorToDojos,
+  validateDojoMongoIds,
+} from "@/lib/dojoInstructors";
 import { requireAdmin, isDuplicateKeyError } from "@/lib/requireAuth";
 import { hashPassword } from "@/lib/password";
 import { NextResponse } from "next/server";
@@ -32,7 +37,8 @@ export async function POST(request) {
 
   try {
     await connectDB();
-    const { name, email, phone, password, role = "instructor" } = await request.json();
+    const { name, email, phone, password, role = "instructor", dojoIds: rawDojoIds } =
+      await request.json();
 
     if (!name || !password) {
       return NextResponse.json(
@@ -62,6 +68,30 @@ export async function POST(request) {
       );
     }
 
+    let validatedDojoIds: string[] = [];
+    if (rawDojoIds !== undefined && rawDojoIds !== null) {
+      if (!Array.isArray(rawDojoIds)) {
+        return NextResponse.json(
+          { success: false, message: "dojoIds must be an array" },
+          { status: 400 }
+        );
+      }
+      try {
+        validatedDojoIds = await validateDojoMongoIds(rawDojoIds);
+      } catch (validationErr) {
+        const message =
+          validationErr instanceof Error ? validationErr.message : "Invalid dojo selection";
+        return NextResponse.json({ success: false, message }, { status: 400 });
+      }
+    }
+
+    if (role === "admin" && validatedDojoIds.length > 0) {
+      return NextResponse.json(
+        { success: false, message: "Admins cannot be assigned to dojos" },
+        { status: 400 }
+      );
+    }
+
     const hashed = await hashPassword(password);
 
     const user = await User.create({
@@ -71,7 +101,13 @@ export async function POST(request) {
       password: hashed,
       role,
       approvalStatus: "approved",
+      dojoIds: role === "instructor" ? validatedDojoIds : [],
     });
+
+    if (role === "instructor" && validatedDojoIds.length > 0) {
+      await linkApprovedInstructorToDojos(user._id, validatedDojoIds, name);
+      revalidateDojosCache();
+    }
 
     const safe = user.toObject();
     delete safe.password;

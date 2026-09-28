@@ -107,6 +107,130 @@ export async function linkApprovedInstructorToDojos(
   }
 }
 
+/** Validate Mongo dojo _id strings against existing dojos. */
+export async function validateDojoMongoIds(rawIds: unknown): Promise<string[]> {
+  if (!Array.isArray(rawIds)) return [];
+
+  const uniqueIds = [...new Set(rawIds.map(String).filter(Boolean))].filter((id) =>
+    mongoose.Types.ObjectId.isValid(id)
+  );
+
+  if (uniqueIds.length === 0) return [];
+
+  const objectIds = uniqueIds.map((id) => new mongoose.Types.ObjectId(id));
+  const dojos = await Dojo.find({ _id: { $in: objectIds } })
+    .select("_id")
+    .lean();
+
+  if (dojos.length !== objectIds.length) {
+    throw new Error("One or more selected dojos are invalid");
+  }
+
+  return dojos.map((d) => String(d._id));
+}
+
+function removeInstructorNameFromList(name: string, instructors: string[]): string[] {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return instructors;
+  return instructors.filter((entry) => entry.trim().toLowerCase() !== normalized);
+}
+
+/**
+ * Replace an instructor's dojo assignments (User.dojoIds and Dojo.instructorIds).
+ * No-op when nextDojoIds is empty (clears all links).
+ */
+export async function replaceInstructorDojoAssignments(
+  instructorUserId: mongoose.Types.ObjectId | string,
+  instructorName: string,
+  nextDojoIds: string[]
+): Promise<void> {
+  const userIdStr = String(instructorUserId);
+  const userObjectId = mongoose.Types.ObjectId.isValid(userIdStr)
+    ? new mongoose.Types.ObjectId(userIdStr)
+    : null;
+  if (!userObjectId) return;
+
+  const user = await User.findById(userObjectId).select("dojoIds name").lean();
+  if (!user) return;
+
+  const name = (instructorName || user.name || "").trim();
+
+  const prevFromUser = new Set((user.dojoIds || []).map(String));
+  const linkedDojos = await Dojo.find({ instructorIds: userObjectId })
+    .select("_id")
+    .lean();
+  for (const dojo of linkedDojos) {
+    prevFromUser.add(String(dojo._id));
+  }
+
+  const next = new Set(nextDojoIds.map(String));
+  const added = [...next].filter((id) => !prevFromUser.has(id));
+  const removed = [...prevFromUser].filter((id) => !next.has(id));
+
+  if (added.length > 0 && name) {
+    await linkApprovedInstructorToDojos(userObjectId, added, name);
+  }
+
+  if (removed.length > 0) {
+    const removedObjectIds = removed.map((id) => new mongoose.Types.ObjectId(id));
+
+    await Dojo.updateMany(
+      { _id: { $in: removedObjectIds } },
+      { $pull: { instructorIds: userObjectId } }
+    );
+
+    await User.updateOne(
+      { _id: userObjectId },
+      { $pull: { dojoIds: { $in: removed } } }
+    );
+
+    if (name) {
+      const dojos = await Dojo.find({ _id: { $in: removedObjectIds } })
+        .select("instructors")
+        .lean();
+      for (const dojo of dojos) {
+        const list = Array.isArray(dojo.instructors) ? [...dojo.instructors] : [];
+        const nextList = removeInstructorNameFromList(name, list);
+        if (nextList.length !== list.length) {
+          await Dojo.updateOne({ _id: dojo._id }, { $set: { instructors: nextList } });
+        }
+      }
+    }
+  }
+
+  if (next.size > 0) {
+    await User.updateOne(
+      { _id: userObjectId },
+      { $set: { dojoIds: [...next] } }
+    );
+  } else {
+    await User.updateOne({ _id: userObjectId }, { $set: { dojoIds: [] } });
+  }
+}
+
+/** Remove all dojo links for a user (e.g. when demoted to admin). */
+export async function clearInstructorDojoLinks(
+  instructorUserId: mongoose.Types.ObjectId | string,
+  instructorName?: string
+): Promise<void> {
+  const userIdStr = String(instructorUserId);
+  if (!mongoose.Types.ObjectId.isValid(userIdStr)) return;
+
+  const user = await User.findById(userIdStr).select("dojoIds name").lean();
+  const name = (instructorName || user?.name || "").trim();
+
+  const prev = new Set<string>();
+  if (user?.dojoIds) {
+    for (const id of user.dojoIds) prev.add(String(id));
+  }
+
+  const userObjectId = new mongoose.Types.ObjectId(userIdStr);
+  const linked = await Dojo.find({ instructorIds: userObjectId }).select("_id").lean();
+  for (const dojo of linked) prev.add(String(dojo._id));
+
+  await replaceInstructorDojoAssignments(userObjectId, name, []);
+}
+
 /** Keep User.dojoIds in sync when a dojo's instructorIds change. */
 export async function syncUserDojoIdsForInstructors(
   dojoMongoId: string,

@@ -4,8 +4,35 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import RowIndexBadge from '@/components/RowIndexBadge';
-import { updateStaffBlocked, updateStaffRole, type StaffUser } from '@/queries/staffQueries';
+import StaffDojoMultiSelect from '@/components/staff/StaffDojoMultiSelect';
+import { useAllDojos } from '@/hooks/useBeltHistory';
+import type { DojoDropdownOption } from '@/queries/studentQueries';
+import {
+  updateStaffBlocked,
+  updateStaffDojos,
+  updateStaffRole,
+  type StaffUser,
+} from '@/queries/staffQueries';
 import { meQuery } from '@/queries/authQueries';
+import { queryKeys } from '@/lib/queryKeys';
+
+function assignedDojoIdsForUser(user: StaffUser, dojos: DojoDropdownOption[]): string[] {
+  const ids = new Set<string>();
+  for (const id of user.dojoIds ?? []) {
+    if (id) ids.add(id);
+  }
+  for (const dojo of dojos) {
+    if (dojo.instructorIds?.includes(user._id)) {
+      ids.add(dojo._id);
+    }
+  }
+  return [...ids];
+}
+
+function assignedDojosForUser(user: StaffUser, dojos: DojoDropdownOption[]) {
+  const idSet = new Set(assignedDojoIdsForUser(user, dojos));
+  return dojos.filter((d) => idSet.has(d._id));
+}
 
 function SkeletonRows() {
   return (
@@ -21,10 +48,15 @@ export default function StaffPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: currentUser } = useQuery(meQuery);
+  const { data: dojos = [], isLoading: loadingDojos } = useAllDojos();
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assignUser, setAssignUser] = useState<StaffUser | null>(null);
+  const [assignDojoIds, setAssignDojoIds] = useState<string[]>([]);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [assignError, setAssignError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -35,6 +67,7 @@ export default function StaffPage() {
     phone: '',
     password: '',
     role: 'instructor' as 'admin' | 'instructor',
+    dojoIds: [] as string[],
   });
 
   const loadUsers = async () => {
@@ -67,9 +100,34 @@ export default function StaffPage() {
       phone: '',
       password: '',
       role: 'instructor',
+      dojoIds: [],
     });
     setFormError('');
     setIsModalOpen(true);
+  };
+
+  const openAssignModal = (user: StaffUser) => {
+    setAssignUser(user);
+    setAssignDojoIds(assignedDojoIdsForUser(user, dojos));
+    setAssignError('');
+  };
+
+  const handleAssignDojos = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignUser) return;
+
+    setAssignSubmitting(true);
+    setAssignError('');
+    try {
+      const { user: updated } = await updateStaffDojos(assignUser._id, assignDojoIds);
+      setUsers((prev) => prev.map((u) => (u._id === updated._id ? { ...u, ...updated } : u)));
+      setAssignUser(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dojos.all() });
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : 'Failed to update dojos');
+    } finally {
+      setAssignSubmitting(false);
+    }
   };
 
   const handleRoleChange = async (userId: string, role: StaffUser['role']) => {
@@ -81,7 +139,9 @@ export default function StaffPage() {
     try {
       const { user: updated, selfUpdated } = await updateStaffRole(userId, role);
       setUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, role: updated.role } : u))
+        prev.map((u) =>
+          u._id === userId ? { ...u, role: updated.role, dojoIds: updated.dojoIds } : u
+        )
       );
       if (selfUpdated) {
         queryClient.setQueryData(meQuery.queryKey, {
@@ -143,12 +203,20 @@ export default function StaffPage() {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          role: formData.role,
+          dojoIds: formData.role === 'instructor' ? formData.dojoIds : [],
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to create user');
       setIsModalOpen(false);
       await loadUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dojos.all() });
     } catch (err) {
       setFormError(err.message || 'Failed to create user');
     } finally {
@@ -188,7 +256,10 @@ export default function StaffPage() {
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl">
           {users.length > 0 ? (
             <div className="divide-y divide-white/[0.04]">
-              {users.map((user, index) => (
+              {users.map((user, index) => {
+                const userDojos =
+                  user.role === 'instructor' ? assignedDojosForUser(user, dojos) : [];
+                return (
                 <div
                   key={user._id}
                   className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:bg-white/[0.01] transition-colors group"
@@ -220,9 +291,35 @@ export default function StaffPage() {
                         {user.email && user.phone && <span className="text-zinc-700">•</span>}
                         {user.phone && <span className="font-mono">{user.phone}</span>}
                       </div>
+                      {user.role === 'instructor' && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {userDojos.length > 0 ? (
+                            userDojos.map((dojo) => (
+                              <span
+                                key={dojo._id}
+                                className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/20 border border-emerald-500/20 text-emerald-400"
+                              >
+                                {dojo.name} · {dojo.location}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-zinc-600">No dojo assigned</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center flex-wrap gap-2 sm:gap-3 shrink-0 sm:self-center">
+                    {user.role === 'instructor' && (
+                      <button
+                        type="button"
+                        onClick={() => openAssignModal(user)}
+                        disabled={updatingId === user._id || blockingId === user._id}
+                        className="text-xs font-medium text-zinc-500 hover:text-zinc-200 transition-colors bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] h-8 px-3 rounded-md disabled:opacity-40"
+                      >
+                        Assign dojos
+                      </button>
+                    )}
                     <label className="sr-only" htmlFor={`role-${user._id}`}>
                       Change role for {user.name}
                     </label>
@@ -269,7 +366,8 @@ export default function StaffPage() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-12 text-center space-y-2">
@@ -366,7 +464,9 @@ export default function StaffPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, role: 'admin' })}
+                    onClick={() =>
+                      setFormData({ ...formData, role: 'admin', dojoIds: [] })
+                    }
                     className={`h-9 text-xs font-medium rounded-lg border transition-all ${
                       formData.role === 'admin'
                         ? 'bg-zinc-100/10 border-zinc-500/40 text-zinc-100'
@@ -378,12 +478,75 @@ export default function StaffPage() {
                 </div>
               </div>
 
+              {formData.role === 'instructor' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-400 tracking-wide">
+                    Dojo locations
+                  </label>
+                  <StaffDojoMultiSelect
+                    dojos={dojos}
+                    selectedIds={formData.dojoIds}
+                    onChange={(dojoIds) => setFormData({ ...formData, dojoIds })}
+                    loading={loadingDojos}
+                    disabled={submitting}
+                  />
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={submitting}
                 className="w-full h-10 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create Staff Account'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {assignUser && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto sm:overflow-visible">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setAssignUser(null)}
+          />
+          <div className="relative w-full sm:max-w-md bg-zinc-950 border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-[0_32px_64px_rgba(0,0,0,0.8)] sm:max-h-[92dvh] sm:overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-sm font-medium text-zinc-100">Assign dojos</h2>
+                <p className="text-[11px] text-zinc-500 mt-0.5">{assignUser.name}</p>
+              </div>
+              <button
+                onClick={() => setAssignUser(null)}
+                className="text-zinc-600 hover:text-zinc-300 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {assignError && (
+              <div className="mb-4 text-xs text-red-400 bg-red-950/30 border border-red-500/20 rounded-lg px-3 py-2">
+                {assignError}
+              </div>
+            )}
+
+            <form onSubmit={handleAssignDojos} className="space-y-4">
+              <StaffDojoMultiSelect
+                dojos={dojos}
+                selectedIds={assignDojoIds}
+                onChange={setAssignDojoIds}
+                loading={loadingDojos}
+                disabled={assignSubmitting}
+              />
+              <button
+                type="submit"
+                disabled={assignSubmitting}
+                className="w-full h-10 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium rounded-lg transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {assignSubmitting ? 'Saving…' : 'Save assignments'}
               </button>
             </form>
           </div>
